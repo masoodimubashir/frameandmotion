@@ -18,7 +18,6 @@ return new class extends Migration
             $table->enum('role_name', ['admin', 'client'])->default('client');
             $table->string('username')->unique();
             $table->string('password');
-            $table->boolean('is_active');
             $table->timestamps();
             $table->unsignedTinyInteger('created_by')->nullable();
             $table->unsignedTinyInteger('updated_by')->nullable();

@@ -86,6 +86,7 @@
     </div>
 
     @push('scripts')
+
         @if (session('success'))
             <script>
                 swal({
@@ -101,6 +102,7 @@
                 });
             </script>
         @endif
+        
     @endpush
 
 

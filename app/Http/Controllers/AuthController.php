@@ -28,7 +28,7 @@ class AuthController extends Controller
 
         $request->validate([
             'username' => 'required|string|min:5',
-            'password' => Password::defaults()->required()
+            'password' => 'required'
         ]);
 
 
@@ -41,7 +41,7 @@ class AuthController extends Controller
             if (Auth::user()->role_name === 'admin') {
 
                 return redirect()->intended('/admin/dashboard');
-            } elseif (Auth::user()->role_name === 'client'  && Auth::user()->is_active === 1) {
+            } elseif (Auth::user()->role_name === 'client') {
 
                 return redirect()->intended('/client/dashboard');
             } else {

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -23,7 +24,6 @@ class User extends Authenticatable
         'name',
         'username',
         'password',
-        'is_active',
         'booking_id',
         'created_by',
         'updated_by',
@@ -62,5 +62,14 @@ class User extends Authenticatable
         return Attribute::make(
             get: fn(string $value) => ucfirst($value),
         );
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(File::class);
+    }
+
+    public function milestones(): HasMany{
+        return $this->hasMany(Milestone::class);
     }
 }

@@ -1,6 +1,7 @@
 <x-app-layout>
 
     <div class="page-inner">
+        
         <div class="page-header">
             <h3 class="fw-bold mb-3">Bookings</h3>
             <ul class="breadcrumbs mb-3">
@@ -15,24 +16,23 @@
                 <li class="nav-item {{ Request::is('bookings') ? 'active' : '' }}">
                     <a href="{{ url('admin/bookings') }}">Bookings</a>
                 </li>
-
             </ul>
         </div>
+
         <div class="row">
+
             <div class="col-12">
 
-                <div class="d-flex align-items-center justify-content-end mb-3">
+                {{-- <div class="d-flex align-items-center justify-content-end mb-3">
                     <button class="btn btn-primary" id="addNewBooking" data-toggle="modal" data-target="#bookingModal">
                         <i class="fas fa-plus-circle mr-2 me-2"></i>Add Booking
                     </button>
-                </div>
+                </div> --}}
 
                 <div class="card">
-
                     <div class="card-body">
-
                         <div class="table-responsive">
-                            <table class="table table-striped  mt-3">
+                            <table class="table table-striped mt-3">
                                 <thead>
                                     <tr>
                                         <th scope="col">Date</th>
@@ -43,26 +43,20 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-
-
                                     @if (count($bookings) > 0)
                                         @foreach ($bookings as $booking)
                                             <tr id="booking-row-{{ $booking->id }}">
-
                                                 <td>{{ $booking->created_at->format('d-M') }}</td>
                                                 <td>{{ $booking->client->name }}</td>
                                                 <td>{{ $booking->booking_date }}</td>
                                                 <td>{{ $booking->ceremony_date }}</td>
                                                 <td class="d-flex align-content-center justify-content-start">
-
                                                     <button class="btn editBooking" data-id="{{ $booking->id }}">
                                                         <i class="fas fa-edit text-success fs-5 mr-1"></i>
                                                     </button>
-
                                                     <button class="btn deleteBooking" data-id="{{ $booking->id }}">
                                                         <i class="fas fa-trash text-danger fs-5 mr-1"></i>
                                                     </button>
-
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -72,7 +66,6 @@
                                                 Found...</td>
                                         </tr>
                                     @endif
-
                                 </tbody>
                             </table>
                         </div>
@@ -83,6 +76,7 @@
             </div>
 
         </div>
+        
     </div>
 
     <!-- Modal for Add/Edit Booking -->
@@ -97,13 +91,14 @@
                 </div>
                 <div class="modal-body">
                     <form id="bookingForm">
+                        
                         @csrf
 
                         <input type="hidden" id="booking_id" name="booking_id">
 
                         <div class="form-group">
                             <label for="client_id">Client</label>
-                            <select class="form-control" id="client_id" name="client_id">
+                            <select class="form-control" style="cursor: pointer" id="client_id" name="client_id">
                                 <option value="" disabled selected>Select a client</option>
                                 @foreach ($clients as $client)
                                     <option value="{{ $client->id }}">{{ $client->name }}</option>
@@ -130,191 +125,114 @@
         </div>
     </div>
 
-
     @push('scripts')
         <script>
             $(document).ready(function() {
-                // Show Add User Modal
-                $('#addNewUser').click(function() {
-                    $('#userForm')[0].reset(); // Reset the form
-                    $('#user_id').val(''); // Clear the user_id
-                    $('#userModalLabel').text('Add New User'); // Set modal title
-                    $('#userModal').modal('show'); // Show the modal
+                // Show Add Booking Modal
+                $('#addNewBooking').click(function() {
+                    $('#bookingForm')[0].reset(); // Reset the form
+                    $('#booking_id').val(''); // Clear the booking_id
+                    $('#bookingModalLabel').text('Add New Booking'); // Set modal title
+                    $('#bookingModal').modal('show'); // Show the modal
                 });
 
-                // Edit User
-                $('.editUser').click(function() {
-                    const userId = $(this).data('id'); // Get user ID from the button
+                // Edit Booking
+                $('.editBooking').click(function() {
+                    const bookingId = $(this).data('id'); // Get booking ID
 
                     $.ajax({
-                        url: `/admin/users/${userId}`, // Fetch the user data
+                        url: `/admin/bookings/${bookingId}`, // Fetch the booking data
                         method: 'GET',
                         success: function(response) {
                             if (response.status === 'success') {
-                                const user = response.user;
+                                const booking = response.booking;
 
-                                $('#user_id').val(user.id);
-                                $('input[name="name"]').val(user.name);
-                                $('input[name="email"]').val(user.email);
-                                $('input[name="password"]').val(''); // Do not pre-fill password
-                                $('select[name="role"]').val(user.role);
+                                $('#booking_id').val(booking.id);
+                                $('#client_id').val(booking.client_id);
+                                $('#booking_date').val(booking.booking_date);
+                                $('#ceremony_date').val(booking.ceremony_date);
 
                                 // Change modal title and show it
-                                $('#userModalLabel').text('Edit User');
-                                $('#userModal').modal('show');
+                                $('#bookingModalLabel').text('Edit Booking');
+                                $('#bookingModal').modal('show');
                             } else {
-                                swal({
-                                    title: "Error!",
-                                    text: "Unable to fetch user details.",
-                                    icon: "error",
-                                    buttons: {
-                                        confirm: {
-                                            text: "OK",
-                                            className: "btn btn-danger"
-                                        }
-                                    }
-                                });
+                                swal("Error!", "Unable to fetch booking details.", "error");
                             }
                         },
                         error: function() {
-                            swal({
-                                title: "Error!",
-                                text: "An unexpected error occurred while fetching user data.",
-                                icon: "error",
-                                buttons: {
-                                    confirm: {
-                                        text: "OK",
-                                        className: "btn btn-danger"
-                                    }
-                                }
-                            });
+                            swal("Error!", "An unexpected error occurred.", "error");
                         }
                     });
                 });
 
-                // Save User (Create/Update)
-                $('#userForm').submit(function(e) {
-                    e.preventDefault(); // Prevent default form submission
+                // Save Booking (Create/Update)
+                $('#bookingForm').submit(function(e) {
+                    e.preventDefault();
 
-                    const formData = $(this).serialize(); // Serialize form data
-                    const userId = $('#user_id').val(); // Get user ID from the hidden input
-                    const url = userId ? `/admin/users/${userId}` : '/admin/users'; // Determine the URL
-                    const method = userId ? 'PUT' : 'POST'; // Use PUT if editing, POST if creating
+                    const formData = $(this).serialize();
+                    const bookingId = $('#booking_id').val();
+                    const url = bookingId ? `/admin/bookings/${bookingId}` : '/admin/bookings';
+                    const method = bookingId ? 'PUT' : 'POST';
 
                     $.ajax({
                         url: url,
                         method: method,
-                        data: formData, // Send form data
+                        data: formData,
                         success: function(response) {
                             if (response.status === 'success') {
-                                $('#userModal').modal('hide'); // Close the modal on success
-                                swal({
-                                    title: "Success!",
-                                    text: response.message,
-                                    icon: "success",
-                                    buttons: {
-                                        confirm: {
-                                            text: "OK",
-                                            className: "btn btn-success"
-                                        }
-                                    }
-                                }).then(() => {
-                                    location.reload(); // Reload the page to reflect changes
+                                $('#bookingModal').modal('hide');
+                                swal("Success!", response.message, "success").then(() => {
+                                    location.reload();
                                 });
                             }
                         },
                         error: function(xhr) {
-                            // Clear previous error messages
-                            $('.is-invalid').removeClass('is-invalid');
-                            $('.invalid-feedback').remove();
-
                             if (xhr.status === 422) {
                                 const errors = xhr.responseJSON.errors;
 
                                 // Display validation errors
                                 $.each(errors, function(field, messages) {
                                     const $input = $(`[name="${field}"]`);
-                                    $input.addClass('is-invalid'); // Add error class
+                                    $input.addClass('is-invalid');
                                     $input.after(
                                         `<div class="invalid-feedback">${messages[0]}</div>`
-                                    ); // Show error message
+                                        );
                                 });
                             } else {
-                                swal({
-                                    title: "Error!",
-                                    text: "An unexpected error occurred. Please try again.",
-                                    icon: "error",
-                                    buttons: {
-                                        confirm: {
-                                            text: "OK",
-                                            className: "btn btn-danger"
-                                        }
-                                    }
-                                });
+                                swal("Error!", "An unexpected error occurred.", "error");
                             }
                         }
                     });
                 });
 
-                // Delete User
-                $('.deleteUser').click(function() {
-                    const userId = $(this).data('id');
+                // Delete Booking
+                $('.deleteBooking').click(function() {
+                    const bookingId = $(this).data('id');
                     const $row = $(this).closest('tr');
 
                     swal({
                         title: "Are you sure?",
-                        text: "Once deleted, you will not be able to recover this user!",
+                        text: "Once deleted, this booking cannot be recovered!",
                         icon: "warning",
-                        buttons: {
-                            cancel: {
-                                text: "Cancel",
-                                visible: true,
-                                className: "btn btn-secondary"
-                            },
-                            confirm: {
-                                text: "Delete",
-                                className: "btn btn-danger"
-                            }
-                        },
+                        buttons: ["Cancel", "Delete"],
                         dangerMode: true,
                     }).then((willDelete) => {
                         if (willDelete) {
                             $.ajax({
-                                url: `/admin/users/${userId}`,
+                                url: `/admin/bookings/${bookingId}`,
                                 method: 'DELETE',
                                 data: {
                                     _token: '{{ csrf_token() }}'
                                 },
                                 success: function(response) {
                                     if (response.status === 'success') {
-                                        swal({
-                                            title: "Deleted!",
-                                            text: "User has been deleted successfully.",
-                                            icon: "success",
-                                            buttons: {
-                                                confirm: {
-                                                    text: "OK",
-                                                    className: "btn btn-success"
-                                                }
-                                            }
-                                        }).then(() => {
-                                            $row
-                                        .remove(); // Remove the row from the table
-                                        });
+                                        $row.remove();
+                                        swal("Deleted!", "Booking deleted successfully.",
+                                            "success");
                                     }
                                 },
                                 error: function() {
-                                    swal({
-                                        title: "Error!",
-                                        text: "Failed to delete user. Please try again.",
-                                        icon: "error",
-                                        buttons: {
-                                            confirm: {
-                                                text: "OK",
-                                                className: "btn btn-danger"
-                                            }
-                                        }
-                                    });
+                                    swal("Error!", "Failed to delete booking.", "error");
                                 }
                             });
                         }
@@ -322,15 +240,14 @@
                 });
 
                 // Clear form errors on modal close
-                $('#userModal').on('hidden.bs.modal', function() {
-                    $('#userForm')[0].reset(); // Reset the form
-                    $('.is-invalid').removeClass('is-invalid'); // Clear error classes
-                    $('.invalid-feedback').remove(); // Remove error messages
-                    $('#user_id').val(''); // Clear the hidden user_id field
+                $('#bookingModal').on('hidden.bs.modal', function() {
+                    $('#bookingForm')[0].reset();
+                    $('.is-invalid').removeClass('is-invalid');
+                    $('.invalid-feedback').remove();
+                    $('#booking_id').val('');
                 });
             });
         </script>
     @endpush
-
 
 </x-app-layout>

@@ -33,7 +33,6 @@
                                         <th scope="col">Name</th>
                                         <th scope="col">Username</th>
                                         <th scope="col">Role</th>
-                                        <th scope="col">Status</th>
                                         <th scope="col">Action</th>
                                     </tr>
                                 </thead>
@@ -41,15 +40,15 @@
                                     @if (count($users) > 0)
                                         @foreach ($users as $user)
                                             <tr id="user-row-{{ $user->id }}">
-                                                <td>{{ $user->name }}</td>
+                                                <td>
+                                                    <a href="{{ url('/admin/' . $user->id . '/view-milestone') }}">
+                                                        {{ $user->name }}
+                                                    
+                                                    </a>
+
+                                                </td>
                                                 <td>{{ $user->username }}</td>
                                                 <td>{{ ucfirst($user->role_name) }}</td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ $user->is_active ? 'badge-success' : 'badge-danger' }}">
-                                                        {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                                    </span>
-                                                </td>
                                                 <td class="d-flex align-content-center justify-content-start">
                                                     <button class="btn editUser" data-id="{{ $user->id }}">
                                                         <i class="fas fa-edit text-success fs-5 mr-1"></i>
@@ -116,16 +115,6 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
-                            <label for="is_active_checkbox">Status</label>
-                            <div class="form-check">
-                                <input type="hidden" name="is_active" value="0">
-                                <input type="checkbox" class="form-check-input" id="is_active_checkbox" name="is_active"
-                                    value="1">
-                                <label class="form-check-label" for="is_active_checkbox">Active</label>
-                            </div>
-                        </div>
-
                         <div class="form-group text-right">
                             <button type="submit" class="btn btn-primary">Save User</button>
                         </div>
@@ -167,7 +156,6 @@
                                 $('#password').prop('required',
                                     false); // Password is optional on edit
                                 $('#booking_id').val(user.booking_id || '');
-                                $('#is_active_checkbox').prop('checked', user.is_active);
 
                                 $('#userModalLabel').text('Edit User');
                                 $('#userModal').modal('show');

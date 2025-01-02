@@ -34,13 +34,14 @@
                             <table class="table table-striped  mt-3">
                                 <thead>
                                     <tr>
+                                        <th scope="col">Status</th>
                                         <th scope="col">Date</th>
                                         <th scope="col">Name</th>
-                                        <th scope="col">address</th>
-                                        <th scope="col">Venue</th>
-                                        <th scope="col">Phone</th>
                                         <th scope="col">Email</th>
-                                        <th scope="col">Action</th>
+                                        <th scope="col">Phone</th>
+                                        <th scope="col">Booking Date</th>
+                                        <th scope="col">Venue</th>
+                                        <th scope="col" class="text-center">Action</th>
 
                                     </tr>
                                 </thead>
@@ -48,28 +49,41 @@
                                     @if (count($clients) > 0)
                                         @foreach ($clients as $client)
                                             <tr id="client-row-{{ $client->id }}">
+                                                @if ($client->is_active)
+                                                    <td class="text-success"> Confirmed</td>
+                                                @else
+                                                    <td class="text-danger"> Unconfirmed</td>
+                                                @endif
                                                 <td>{{ $client->created_at->format('d-M') }}</td>
                                                 <td>{{ $client->name }}</td>
-                                                <td>{{ $client->address }}</td>
-                                                <td>{{ $client->venue }}</td>
-                                                <td>{{ $client->phone }}</td>
                                                 <td>{{ $client->email }}</td>
+                                                <td>{{ $client->number }}</td>
+                                                <td>{{ $client->date }}</td>
+                                                <td>{{ $client->venue }}</td>
                                                 <td class="d-flex align-content-center justify-content-start">
 
                                                     <button class="btn editClient" data-id="{{ $client->id }}">
-                                                        <i class="fas fa-edit text-success fs-5 mr-1"></i>
+                                                        <i class="fas fa-edit text-success  "></i>
                                                     </button>
 
                                                     <button class="btn deleteClient" data-id="{{ $client->id }}">
-                                                        <i class="fas fa-trash text-danger fs-5 mr-1"></i>
+                                                        <i class="fas fa-trash text-danger "></i>
                                                     </button>
+
+                                                    <a class="btn btn-sm badge badge-success mt-2 me-1"
+                                                        href="javascript:void(0)" data-id="{{ $client->id }}"
+                                                        data-status="1" onclick="updateBooking(this)">Accept</a>
+
+                                                    <a class="btn btn-sm badge badge-danger mt-2"
+                                                        href="javascript:void(0)" data-id="{{ $client->id }}"
+                                                        data-status="0" onclick="updateBooking(this)">Cancel</a>
 
                                                 </td>
                                             </tr>
                                         @endforeach
                                     @else
                                         <tr>
-                                            <td colspan="6" class="text-center text-danger fw-bold">No Records
+                                            <td colspan="7" class="text-center text-danger fw-bold">No Records
                                                 Found...
                                             </td>
                                         </tr>
@@ -102,42 +116,54 @@
                 </div>
                 <div class="modal-body">
                     <form id="clientForm">
+                        
                         @csrf
 
                         <input type="hidden" id="client_id" name="client_id">
 
-                        <div class="form-group">
-                            <label for="name">Name</label>
-                            <input type="text" class="form-control" id="name" name="name"
-                                placeholder="Enter name">
+                        <div class="form-group row">
+                            <div class="col-md-6">
+                                <label for="name">Name</label>
+                                <input type="text" class="form-control" id="name" name="name"
+                                    placeholder="Enter name">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="number">Number</label>
+                                <input type="text" class="form-control" id="number" name="number"
+                                    placeholder="Enter phone number">
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <div class="col-md-6">
+                                <label for="venue">Venue</label>
+                                <input type="text" class="form-control" id="venue" name="venue"
+                                    placeholder="Enter Venue">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="email">Email</label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                    placeholder="Enter email">
+                            </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="phone">Phone</label>
-                            <input type="text" class="form-control" id="phone" name="phone"
-                                placeholder="Enter phone number">
+                            <label for="date">Date</label>
+                            <input type="date" class="form-control" id="date" name="date"
+                                placeholder="Enter date">
                         </div>
 
                         <div class="form-group">
-                            <label for="phone">Venue</label>
-                            <input type="text" class="form-control" id="venue" name="venue"
-                                placeholder="Enter Venue">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="email">Email</label>
-                            <input type="email" class="form-control" id="email" name="email"
-                                placeholder="Enter email">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="address">Address</label>
-                            <textarea class="form-control" id="address" name="address" placeholder="Enter address" rows="3"></textarea>
+                            <label for="message">Message</label>
+                            <textarea class="form-control" id="message" name="message" placeholder="Enter message" rows="3"></textarea>
                         </div>
 
                         <div class="form-group text-right">
                             <button type="submit" class="btn btn-primary">Save Client</button>
                         </div>
+
                     </form>
                 </div>
             </div>
@@ -145,8 +171,97 @@
     </div>
 
 
+
     @push('scripts')
         <script>
+            function updateBooking(button) {
+                let bookingId = $(button).data('id');
+                let status = $(button).data('status');
+
+                // Show a confirmation alert before sending the request
+                swal({
+                    title: "Are you sure?",
+                    text: status == 1 ? "You are accepting this booking!" : "You are canceling this booking!",
+                    icon: "warning",
+                    buttons: {
+                        cancel: {
+                            text: "Cancel",
+                            value: null,
+                            visible: true,
+                            className: "btn btn-secondary",
+                            closeModal: true,
+                        },
+                        confirm: {
+                            text: "Yes, proceed!",
+                            value: true,
+                            visible: true,
+                            className: "btn btn-primary",
+                            closeModal: false
+                        }
+                    }
+                }).then((isConfirmed) => {
+                    if (isConfirmed) {
+                        // Make the AJAX request
+                        $.ajax({
+                            url: '/admin/confirm-bookings',
+                            type: 'POST',
+                            data: {
+                                id: bookingId,
+                                is_active: status,
+                                _token: '{{ csrf_token() }}',
+                                _method: 'PUT',
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    swal({
+                                        title: "Success!",
+                                        text: "Booking Updated!",
+                                        icon: "success",
+                                        buttons: {
+                                            confirm: {
+                                                text: "OK",
+                                                className: "btn btn-success"
+                                            }
+                                        }
+                                    }).then(() => {
+                                        // Refresh the page after the alert is closed
+                                        location.reload();
+                                    });
+                                } else {
+                                    swal({
+                                        title: "Error!",
+                                        text: response.message ||
+                                            "Failed to book the client.",
+                                        icon: "error",
+                                        buttons: {
+                                            confirm: {
+                                                text: "OK",
+                                                className: "btn btn-danger"
+                                            }
+                                        }
+                                    });
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                console.error('Error:', error);
+                                swal({
+                                    title: "Error!",
+                                    text: "An error occurred. Please try again.",
+                                    icon: "error",
+                                    buttons: {
+                                        confirm: {
+                                            text: "OK",
+                                            className: "btn btn-danger"
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
+
             $(document).ready(function() {
 
                 // Show Add Client Modal
@@ -156,6 +271,10 @@
                     $('#clientModalLabel').text('Add New Client'); // Set modal title
                     $('#clientModal').modal('show'); // Show the modal
                 });
+
+
+
+
 
 
                 // Edit Client
@@ -172,9 +291,11 @@
                                 $('#client_id').val(client.id);
                                 $('input[name="name"]').val(client.name);
                                 $('input[name="email"]').val(client.email);
-                                $('input[name="phone"]').val(client.phone);
+                                $('input[name="phone"]').val(client.number);
                                 $('input[name="venue"]').val(client.venue);
-                                $('textarea[name="address"]').val(client.address);
+                                $('input[name="date"]').val(client.date);
+                                $('textarea[name="message"]').val(client.message);
+
 
                                 // Change modal title and show it
                                 $('#clientModalLabel').text('Edit Client');

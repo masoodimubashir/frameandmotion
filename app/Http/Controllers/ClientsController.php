@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Admin\clients;
+use App\Mail\BookingMail;
 use App\Models\Client;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Str;
 
 class ClientsController extends Controller
 {
@@ -20,7 +20,9 @@ class ClientsController extends Controller
      */
     public function index()
     {
+
         $clients = CLient::latest()->paginate(10);
+
         return view('admin.clients.show-clients', compact('clients'));
     }
 
@@ -32,15 +34,18 @@ class ClientsController extends Controller
 
 
         $validator = Validator::make($request->all(), [
+
             'name' => 'required|string|min:5',
-            'address' => 'required|string',
-            'phone' => 'required|integer|digits:10',
+            'number' => 'required|integer|digits:10',
             'email' => 'required|email|unique:clients,email',
-            'venue' => 'required|string'
+            'venue' => 'required|string',
+            'date' => 'required',
+            'message' => 'required'
+
         ]);
 
-        // Check validation
         if ($validator->fails()) {
+
             return response()->json([
                 'status' => 'error',
                 'errors' => $validator->errors()
@@ -48,21 +53,63 @@ class ClientsController extends Controller
         }
 
         try {
-            // Create new user
+
             $client = Client::create([
                 'name' => $request->name,
-                'address' => $request->address,
-                'phone' => $request->phone,
+                'number' => $request->number,
                 'email' => $request->email,
                 'venue' => $request->venue,
+                'date' => $request->date,
+                'message' => $request->message,
                 'created_by' => Auth::user()->id
             ]);
+
+            // Need To Recheck This Logic
+
+            // if ($client->is_active) {
+
+            //     $booking = $client->booking()->create([
+            //         'booking_date' => $client->date,
+            //         'ceremony_date' => $client->date,
+            //     ]);
+
+            //     if ($booking) {
+
+            //         $username = strtolower(str_replace(' ', '.', $client->name)) . '.' . $booking->id;
+
+            //         $password = Str::random(6);
+
+            //         $user = User::create([
+            //             'name' => $client->name,
+            //             'booking_id' => $booking->id,
+            //             'role_name' => 'client',
+            //             'username' => $username,
+            //             'password' => bcrypt($password),
+            //             'created_by' => auth()->id() ?? null,
+            //         ]);
+
+            //         $data = [
+            //             'name' => $client->name,
+            //             'email' => $client->email,
+            //             'number' => $client->phone_number,
+            //             'venue' => $client->venue,
+            //             'date' => $client->date,
+            //             'message' => 'Booking created successfully',
+            //             'username' => $username,
+            //             'password' => $password,
+            //         ];
+
+            //         Mail::to($client->email)->send(new BookingMail($data));
+            // }
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Client created successfully',
                 'client' => $client
             ], 201);
+
+            // }
+
         } catch (\Exception $e) {
 
             return response()->json([
@@ -79,12 +126,15 @@ class ClientsController extends Controller
     public function show($id)
     {
         try {
+
             $client = Client::findOrFail($id);
+
             return response()->json([
                 'status' => 'success',
                 'client' => $client
             ]);
         } catch (\Exception $e) {
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'client not found'
@@ -136,7 +186,6 @@ class ClientsController extends Controller
                 'message' => 'Client updated successfully',
                 'client' => $client
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Client;
+use Barryvdh\Debugbar\Facades\Debugbar;
+use Barryvdh\Debugbar\Twig\Extension\Debug;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -18,7 +20,9 @@ class BookingsController extends Controller
     {
 
         $bookings = Booking::with('client')->latest()->paginate(10);
+
         $clients = Client::all();
+
         return view('admin.booking.show-booking', compact('bookings', 'clients'));
 
     }
@@ -36,7 +40,6 @@ class BookingsController extends Controller
         ]);
 
 
-        // Check validation
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
@@ -44,8 +47,9 @@ class BookingsController extends Controller
             ], 422);
         }
 
+
         try {
-            // Create new booking
+            
             $booking = Booking::create([
                 'client_id' => $request->client_id,
                 'booking_date' => $request->booking_date,
@@ -58,6 +62,7 @@ class BookingsController extends Controller
                 'message' => 'Booking created successfully',
                 'booking' => $booking
             ], 201);
+
         } catch (\Exception $e) {
 
             return response()->json([
@@ -65,6 +70,7 @@ class BookingsController extends Controller
                 'message' => 'Failed to create booking',
                 'error' => $e->getMessage()
             ], 500);
+            
         }
     }
 
@@ -136,6 +142,9 @@ class BookingsController extends Controller
     public function destroy($id)
     {
         try {
+
+            Debugbar::error($id);
+
             $booking = Booking::findOrFail($id);
             $booking->delete();
 
@@ -144,6 +153,7 @@ class BookingsController extends Controller
                 'message' => 'Booking deleted successfully'
             ]);
         } catch (\Exception $e) {
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to delete booking',
