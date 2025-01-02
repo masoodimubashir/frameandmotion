@@ -9,7 +9,7 @@
         "php": "^8.2",
         "barryvdh/laravel-debugbar": "^3.14",
         "fpdf/fpdf": "^1.86",
-        "google/apiclient": "2.15.0",
+        "google/apiclient": "^2.18",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9"
     },
