@@ -8,6 +8,7 @@ use App\Models\User;
 use Google\Service\Drive;
 use Google\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -25,14 +26,48 @@ class FLipBookController extends Controller
         $this->drive = new Drive($client);
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $files = File::paginate(10);
-        $users = User::where('role_name', 'client')->get();
-        return response()->json([
-            'files' => $files,
-            'users' => $users
-        ]);
+        try {
+
+            // Get users who have files
+            $users = User::whereIn('id', File::select('user_id')->distinct())
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            if ($request->ajax()) {
+
+                $query = File::query();
+
+                // Apply user filter if provided
+                if ($request->has('user_id') && $request->user_id) {
+                    $query->where('user_id', $request->user_id);
+                }
+
+                // Get paginated results
+                $files = $query->with('user') // Eager load user relationship
+                    ->orderBy('created_at', 'desc')
+                    ->paginate(12);
+
+                return response()->json([
+                    'success' => true,
+                    'users' => $users,
+                    'files' => $files,
+                ]);
+            }
+
+    
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch images: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to load images: ' . $e->getMessage());
+        }
     }
 
     public function store(Request $request)
@@ -89,7 +124,7 @@ class FLipBookController extends Controller
 
             // Upload images to the folder
             foreach ($request->file('images') as $file) {
-                
+
                 $fileName = time() . '_' . $file->getClientOriginalName();
 
                 $uploadedFile = $this->drive->files->create(
@@ -220,64 +255,89 @@ class FLipBookController extends Controller
 
     public function destroy(Request $request)
     {
-        try {
-            // Decode JSON input if it's a string
-            $images = json_decode($request->input('images'), true);
 
-            if (!is_array($images)) {
+        try {
+            $validation = Validator::make($request->all(), [
+                'images' => ['required', 'string'], // JSON string of image data
+            ]);
+
+            if ($validation->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid images input. Expected an array.',
-                ], 400);
+                    'message' => $validation->errors()->first()
+                ], 422);
             }
 
-            $folderId = null;
+            // Decode the JSON string of images
+            $images = json_decode($request->images, true);
+
+            if (!is_array($images) || empty($images)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No images provided for deletion'
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            $deletedCount = 0;
+            $errors = [];
 
             foreach ($images as $image) {
-                $file = File::find($image['id']);
+                try {
+                    // Find the file in database
+                    $file = File::where('id', $image['id'])
+                        ->where('drive_id', $image['drive_id'])
+                        ->first();
 
-                if ($file) {
-                    $folderId = $file->folder_id;
-
-                    // Delete the file from Google Drive
-                    $this->drive->files->delete($image['drive_id']);
-
-                    // Delete the record from the database
-                    $file->delete();
-                }
-            }
-
-            // Check if the folder is empty in Google Drive and delete it if so
-            if ($folderId) {
-                // Query the folder contents in Google Drive
-                $query = "'{$folderId}' in parents and trashed = false";
-                $response = $this->drive->files->listFiles([
-                    'q' => $query,
-                    'fields' => 'files(id)',
-                ]);
-
-                $folderContents = $response->getFiles();
-
-                // If folder is empty, delete it
-                if (empty($folderContents)) {
-                    $this->drive->files->delete($folderId);
-
-                    // Delete the folder record from the database
-                    $folder = Folder::find($folderId); // Adjust your model if necessary
-                    if ($folder) {
-                        $folder->delete();
+                    if (!$file) {
+                        $errors[] = "File with ID {$image['id']} not found";
+                        continue;
                     }
+
+                    // Delete from Google Drive
+                    try {
+                        $this->drive->files->delete($file->drive_id);
+                    } catch (\Google\Service\Exception $e) {
+                        // If file doesn't exist in Drive, we'll still continue to delete from DB
+                        if ($e->getCode() !== 404) {
+                            $errors[] = "Failed to delete file {$file->name} from Drive: " . $e->getMessage();
+                            continue;
+                        }
+                    }
+
+                    // Delete from database
+                    $file->delete();
+                    $deletedCount++;
+                } catch (\Exception $e) {
+                    $errors[] = "Error processing file {$image['id']}: " . $e->getMessage();
                 }
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Images deleted successfully.',
-            ]);
+            if ($deletedCount > 0) {
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "$deletedCount files deleted successfully" .
+                        (count($errors) > 0 ? " with " . count($errors) . " errors" : ""),
+                    'errors' => $errors
+                ]);
+            } else {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No files were deleted',
+                    'errors' => $errors
+                ], 500);
+            }
         } catch (\Exception $e) {
+            DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting images: ' . $e->getMessage(),
+                'message' => 'Delete operation failed: ' . $e->getMessage()
             ], 500);
         }
     }

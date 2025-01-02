@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class File extends Model
 {
@@ -11,4 +12,9 @@ class File extends Model
     protected $except = [
         'admin/files/*'  // Add this line
     ];
+
+
+    public function user(): BelongsTo{
+        return $this->belongsTo(User::class);
+    }
 }

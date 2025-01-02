@@ -71,13 +71,42 @@
             <div class="col-12">
 
 
-                <button type="button" class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal"
-                    data-bs-target="#uploadModal">
-                    <i class="fas fa-upload"></i>
-                    Upload Images
-                </button>w
 
-                <div id='tableContainer' style="min-height: 900px;">
+                <div class="d-flex justify-content-end align-items-center">
+                    <div>
+                        <button type="button" class="btn btn-primary d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="fas fa-upload"></i>
+                            Upload Images
+                        </button>
+                    </div>
+
+
+                    <div>
+                        <button id="deleteSelected" class="btn btn-danger">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+
+
+                    <div>
+                        <select id="userFilter" class="form-select">
+                            <option value="">All Users</option>
+                            @foreach ($users as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </select>
+                        <button id="clearFilter" class="btn btn-sm btn-outline-secondary mt-4" style="display: none;">
+                            Clear Filter
+                        </button>
+                    </div>
+
+                </div>
+
+
+
+
+                <div id='tableContainer' style="min-height: 900px;" class="mt-5">
                 </div>
 
 
@@ -166,12 +195,6 @@
 
     </div>
 
-
-
-
-
-
-
     <!-- Edit Image Modal -->
     <div class="modal fade" id="editImageModal" tabindex="-1" role="dialog" aria-labelledby="editImageModalLabel"
         aria-hidden="true">
@@ -233,6 +256,10 @@
         <script>
             $(document).ready(function() {
 
+
+
+
+
                 function loadUsers() {
                     $.ajax({
                         url: '/admin/flipbook',
@@ -291,19 +318,45 @@
                     });
                 }
 
+                // Initialize the page
+                loadImages();
 
+                // Handle filter change
+                $('#userFilter').on('change', function() {
+                    const selectedUserId = $(this).val();
+                    loadImages(1, selectedUserId);
+                    $('#clearFilter').toggle(!!selectedUserId);
+                });
 
-                function loadImages(page = 1) {
+                // Handle clear filter
+                $('#clearFilter').on('click', function() {
+                    $('#userFilter').val('');
+                    loadImages(1);
+                    $(this).hide();
+                });
+
+                function loadImages(page = 1, userId = null) {
                     $('#loadingButton').show();
+                    $('#tableContainer').addClass('loading');
 
-                    $.get(`{{ url('admin/flipbook') }}?page=${page}`, function(response) {
+                    let url = `{{ url('/admin/flipbook') }}?page=${page}`;
+                    if (userId) {
+                        url += `&user_id=${userId}`;
+                    }
+
+                    $.get(url, function(response) {
+                        if (!response.success) {
+                            swal("Error!", response.message || "Failed to load images.", "error");
+                            return;
+                        }
+
                         $('#tableContainer').empty();
                         const files = response.files;
                         $('#loadingButton').hide();
+                        $('#tableContainer').removeClass('loading');
 
                         // Select All Section
                         const selectAllContainer = $('<div>').addClass('mb-3 d-flex align-items-center');
-
                         const selectAllCheckbox = $('<input>')
                             .attr('type', 'checkbox')
                             .attr('id', 'selectAll')
@@ -455,175 +508,43 @@
 
                         $('#tableContainer').append(cardContainer);
 
-                        // Pagination
-                        if (response.files.links) {
+                        // Add pagination
+                        if (files.links && files.links.length > 3) {
                             let pagination = $('<div>').addClass(
-                                'pagination-container mt-3 d-flex justify-content-center');
-                            response.files.links.forEach(function(link) {
+                                'pagination-container mt-3 d-flex justify-content-center'
+                            );
+                            files.links.forEach(function(link) {
                                 let pageLink = $('<button>')
                                     .html(link.label)
                                     .addClass(link.active ? 'btn btn-primary mx-1' :
                                         'btn btn-outline-primary mx-1')
                                     .prop('disabled', link.active)
                                     .click(function() {
-                                        if (!link.active) {
-                                            loadImages(link.url.split('page=')[1]);
-                                        }
+                                        if (!link.url) return;
+                                        const pageNum = link.url.split('page=')[1];
+                                        loadImages(pageNum, userId);
                                     });
                                 pagination.append(pageLink);
                             });
                             $('#tableContainer').append(pagination);
                         }
 
-                        // Hover effects
-                        $('.card').hover(
-                            function() {
-                                $(this).find('.edit-button, .image-checkbox').css('opacity', '1');
-                                $(this).css('box-shadow', '0 4px 8px rgba(0,0,0,0.2)');
-                            },
-                            function() {
-                                $(this).find('.edit-button, .image-checkbox').css('opacity', '0.9');
-                                $(this).css('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
-                            }
-                        );
+                        // Update the URL without reloading the page
+                        const newUrl = new URL(window.location);
+                        if (userId) {
+                            newUrl.searchParams.set('user_id', userId);
+                        } else {
+                            newUrl.searchParams.delete('user_id');
+                        }
+                        window.history.pushState({}, '', newUrl);
 
-                    }).fail(function() {
+                    }).fail(function(xhr) {
                         $('#loadingButton').hide();
-                        swal("Error!", "Failed To Load Images.", "error");
+                        $('#tableContainer').removeClass('loading');
+                        swal("Error!", "Failed to load images.", "error");
                     });
                 }
 
-
-                // Load Images Here
-                // function loadImages(page = 1) {
-                //     // Show the loading button
-                //     $('#loadingButton').show();
-
-                //     $.get(`{{ url('admin/flipbook') }}?page=${page}`, function(response) {
-                //         $('#tableContainer').empty();
-
-                //         const files = response.files;
-
-                //         // Hide the loading button when the data is fetched
-                //         $('#loadingButton').hide();
-
-                //         // Add select all checkbox
-                //         const selectAllContainer = $('<div>').addClass('mb-3 d-flex align-items-center');
-                //         const selectAllCheckbox = $('<input>')
-                //             .attr('type', 'checkbox')
-                //             .attr('id', 'selectAll')
-                //             .addClass('me-2 form-check-input');
-                //         const selectAllLabel = $('<label>')
-                //             .attr('for', 'selectAll')
-                //             .addClass('form-check-label')
-                //             .text('Select All');
-
-                //         selectAllContainer.append(selectAllCheckbox, selectAllLabel);
-                //         $('#tableContainer').append(selectAllContainer);
-
-                //         // Create a responsive grid container for cards
-                //         let cardContainer = $('<div>').addClass('row g-4');
-
-                //         files.data.forEach(function(file) {
-
-
-
-                //             // Card wrapper with bootstrap grid
-                //             let cardWrapper = $('<div>').addClass('col-sm-6 col-md-4 col-lg-3');
-
-                //             let card = $('<div>')
-                //                 .addClass('card h-100 shadow-sm rounded')
-                //                 .css({
-                //                     'overflow': 'hidden',
-                //                     'border': 'none',
-                //                     'border-radius': '10px',
-                //                 });
-
-
-                //             // Card preview area
-                //             let preview = $('<img>')
-                //                 .attr('src', `https://lh3.google.com/u/0/d/${file.drive_id}`) 
-                //                 .attr('width', '100%')
-                //                 .attr('height', '200')
-                //                 .attr('frameborder', '0')
-                //                 .addClass('card-img-top')
-                //                 .css({
-                //                     'border-radius': '10px 10px 0 0',
-                //                 });
-
-                //             // Card body with file details
-                //             let cardBody = $('<div>').addClass('card-body text-center p-1');
-
-                //             let fileName = $('<h6>')
-                //                 .addClass('card-title text-truncate')
-                //                 .css('max-width', '100%'); // Ensure long names truncate properly
-
-                //             // Checkbox with image data
-                //             let checkbox = $('<input>')
-                //                 .attr('type', 'checkbox')
-                //                 .addClass('image-checkbox form-check-input mb-3')
-                //                 .attr('data-id', file.id)
-                //                 .attr('data-drive-id', file.drive_id);
-
-                //             // Action buttons
-                //             let actionButtons = $('<div>').addClass(
-                //                 'd-flex justify-content-around mt-2');
-
-                //             let editButton = $('<button>')
-                //                 .addClass('btn btn-sm btn-warning edit-button')
-                //                 .attr('data-id', file.id)
-                //                 .attr('data-name', file.name)
-                //                 .attr('data-drive-id', file.drive_id)
-                //                 .html('<i class="fas fa-edit"></i>'); // Font Awesome Edit Icon
-
-                //             // Uncomment if you want a delete button
-                //             // let deleteButton = $('<button>')
-                //             //     .addClass('btn btn-sm btn-danger delete-button')
-                //             //     .attr('data-id', file.id)
-                //             //     .attr('data-drive-id', file.drive_id)
-                //             //     .html('<i class="fas fa-trash-alt"></i>'); // Font Awesome Delete Icon
-
-                //             actionButtons.append(editButton); // Add buttons to container
-                //             cardBody.append(checkbox, fileName, actionButtons); // Add to card body
-
-                //             card.append(preview, cardBody); // Combine card components
-                //             cardWrapper.append(card); // Place card in grid column
-                //             cardContainer.append(cardWrapper); // Add column to grid
-                //         });
-
-                //         $('#tableContainer').append(cardContainer);
-
-
-                //         // Add pagination if needed
-                //         if (response.files.links) {
-                //             console.log(response.files.links);
-
-                //             let pagination = $('<div>').addClass(
-                //                 'pagination-container mt-3 d-flex justify-content-center');
-                //             response.files.links.forEach(function(link) {
-                //                 let pageLink = $('<button>')
-                //                     .html(link.label)
-                //                     .addClass(link.active ? 'btn btn-primary mx-1' :
-                //                         'btn btn-outline-primary mx-1')
-                //                     .prop('disabled', link.active) // Disable the active button
-                //                     .click(function() {
-                //                         if (!link.active) {
-                //                             loadImages(link.url.split('page=')[1]);
-                //                         }
-                //                     });
-                //                 pagination.append(pageLink);
-                //             });
-                //             $('#tableContainer').append(pagination);
-                //         }
-                //     }).fail(function() {
-                //         // Hide the loading button in case of error
-                //         $('#loadingButton').hide();
-                //         swal("Error!", "Failed To Load Users.", "error");
-                //     });
-                // }
-
-
-                // Reset the form and configure modal behavior
                 $('#uploadModalTrigger').click(function() {
                     $('#uploadForm')[0].reset(); // Reset the upload form
                     $('#uploadModalLabel').text('Upload Images'); // Set modal title
@@ -679,7 +600,6 @@
                     });
                 });
 
-                // Fetch users for dropdown
                 function fetchUsers() {
                     $.ajax({
                         url: '/admin/flipbook',
@@ -703,7 +623,6 @@
                     });
                 }
 
-                // When edit button is clicked
                 $(document).on('click', '.edit-button', function() {
                     const userId = $(this).data('user-id'); // Add this data attribute to your edit button
                     const imageId = $(this).data('id');
@@ -795,88 +714,105 @@
                 });
 
 
+                // Add Delete Selected button to the page
+                const deleteButtonContainer = $('<div>').addClass('mb-3 ms-3');
+                const deleteButton = $('<button>')
+                    .attr('id', 'deleteSelected')
+                    .addClass('btn btn-danger')
+                    .text('Delete Selected')
+                    .prop('disabled', true);
+                deleteButtonContainer.append(deleteButton);
 
+                // Add it after the select all container
+                $('#tableContainer').find('.mb-3').after(deleteButtonContainer);
 
+                // Handle delete selected functionality
+                $('#deleteSelected').click(function() {
 
+                    const selectedImages = $('.image-checkbox:checked').map(function() {
+                        return {
+                            id: $(this).data('id'),
+                            drive_id: $(this).data('drive-id')
+                        };
+                    }).get();
 
+                    if (selectedImages.length === 0) {
+                        swal("Warning!", "Please select at least one image to delete.", "error");
+                        return;
+                    }
 
+                    swal({
+                        title: "Are you sure?",
+                        text: `You are about to delete ${selectedImages.length} selected image(s). This action cannot be undone.`,
+                        icon: "warning",
+                        buttons: ["Cancel", "Delete"],
+                        dangerMode: true,
+                    }).then((willDelete) => {
+                        if (!willDelete) return;
 
-                // $('#deleteSelected').click(function() {
-                //     const selectedImages = $('.image-checkbox:checked').map(function() {
-                //         return {
-                //             id: $(this).data('id'),
-                //             drive_id: $(this).data('drive-id')
-                //         };
-                //     }).get();
+                        const formData = new FormData();
+                        formData.append('_method', 'DELETE');
+                        formData.append('images', JSON.stringify(selectedImages));
 
-                //     if (selectedImages.length === 0) {
-                //         swal("Warning!", "Please select at least one image to delete.", "error");
-                //         return;
-                //     }
+                        $.ajax({
+                            url: '/admin/flipbook',
+                            type: 'POST',
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            },
+                            beforeSend: function() {
+                                swal({
+                                    title: 'Processing...',
+                                    text: 'Please wait while we delete the selected images.',
+                                    icon: 'info',
+                                    buttons: false,
+                                    closeOnClickOutside: false
+                                });
+                            },
+                            success: function(response) {
+                                swal.close();
+                                if (response.success) {
+                                    swal('Success!',
+                                        `Successfully deleted ${selectedImages.length} images.`,
+                                        'success'
+                                    ).then(() => {
+                                        loadImages(); // Reload the images
+                                    });
+                                } else {
+                                    swal("Error!", response.message ||
+                                        "Error deleting the images.", "error");
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                swal.close();
+                                let errorMessage = xhr.responseJSON?.message || xhr
+                                    .responseText || 'An unexpected error occurred.';
+                                swal("Error!", errorMessage, "error");
+                                console.error('Detailed error:', {
+                                    xhr,
+                                    status,
+                                    error
+                                });
+                            }
+                        });
+                    });
+                });
 
-                //     const formData = new FormData();
-                //     formData.append('_method', 'DELETE');
-                //     formData.append('images', JSON.stringify(selectedImages));
+                // Handle select all functionality
+                $(document).on('change', '#selectAll', function() {
+                    $('.image-checkbox').prop('checked', $(this).prop('checked'));
+                    updateDeleteButton();
+                });
 
-                //     $.ajax({
-                //         url: '/admin/flipbook',
-                //         type: 'POST',
-                //         data: formData,
-                //         processData: false,
-                //         contentType: false,
-                //         headers: {
-                //             'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                //         },
-                //         beforeSend: function() {
-                //             swal({
-                //                 title: 'Processing...',
-                //                 text: 'Please wait while we delete the selected images.',
-                //                 icon: 'info',
-                //                 buttons: false,
-                //                 closeOnClickOutside: false
-                //             }).then(() => {
-                //                 loadImages();
-                //             });
-                //         },
-                //         success: function(response) {
-                //             swal.close();
-                //             if (response.success) {
-                //                 swal('Success!',
-                //                     `Successfully deleted ${selectedImages.length} images.`,
-                //                     'success');
-                //                 loadImages(); // Reload the images
-                //             } else {
-                //                 swal("Error!", response.message || "Error deleting the images.",
-                //                     "error");
-                //             }
-                //         },
-                //         error: function(xhr, status, error) {
-                //             swal.close();
-                //             let errorMessage = xhr.responseJSON?.message || xhr.responseText ||
-                //                 'An unexpected error occurred.';
-                //             swal("Error!", errorMessage, "error");
-                //             console.error('Detailed error:', {
-                //                 xhr,
-                //                 status,
-                //                 error
-                //             });
-                //         }
-                //     });
-                // });
-
-
-
-
-                // // Handle select all functionality
-                // $(document).on('change', '#selectAll', function() {
-                //     $('.image-checkbox').prop('checked', $(this).prop('checked'));
-                //     updateDeleteButton();
-                // });
-
-                // // Handle individual checkbox changes
-                // $(document).on('change', '.image-checkbox', function() {
-                //     updateDeleteButton();
-                // });
+                // Handle individual checkbox changes
+                $(document).on('change', '.image-checkbox', function() {
+                    const allChecked = $('.image-checkbox').length === $('.image-checkbox:checked').length;
+                    $('#selectAll').prop('checked', allChecked);
+                    updateDeleteButton();
+                });
 
                 // Update delete button state
                 function updateDeleteButton() {
@@ -886,11 +822,10 @@
                     ).prop('disabled', selectedCount === 0);
                 }
 
-
                 // Initialize the page
-                loadImages();
                 fetchUsers();
                 loadUsers();
+
 
             });
         </script>

@@ -14,6 +14,7 @@ use App\Http\Controllers\Client\ClientDashboardController;
 use App\Http\Controllers\Client\UserFlipBoardController;
 use App\Http\Controllers\ClientsController;
 use App\Http\Controllers\FileController;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'welcome'])->name('login');
@@ -24,12 +25,12 @@ Route::get('/logout', [AuthController::class, 'logout']);
 Route::middleware(['auth', 'isAdmin'])->prefix('admin')->group(function () {
 
     Route::get('/view-flipbook', function () {
-        return view('admin.flipbook.show-flipbook');
+        $users = User::where('role_name', 'client')->get();
+        return view('admin.flipbook.show-flipbook', compact('users'));
     });
 
     Route::get('/{id}/view-milestone', [ViewUserMilestoneController::class, 'index']);
     Route::resource('/milestone', MilestoneController::class);
-
 
     Route::get('/dashboard', [DashboardController::class, 'dashboard']);
 
