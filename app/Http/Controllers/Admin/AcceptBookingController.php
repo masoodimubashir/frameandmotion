@@ -2,97 +2,178 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\GoogleCalendarService as AppGoogleCalendarService;
 use App\Http\Controllers\Controller;
 use App\Mail\BookingMail;
 use App\Models\Client;
 use App\Models\User;
+use App\Service\GoogleAuthService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+
 
 class AcceptBookingController extends Controller
 {
 
+    protected $googleAuthService;
+    protected $googleCalendarService;
 
+    /**
+     * Constructor for the class.
+     *
+     * @param \App\Services\GoogleAuthService $googleAuthService  The Google authentication service
+     * @param \App\Services\AppGoogleCalendarService $googleCalendarService  The Google Calendar service
+     */
+    public function __construct(GoogleAuthService $googleAuthService, AppGoogleCalendarService $googleCalendarService)
+    {
+        $this->googleAuthService = $googleAuthService;
+        $this->googleCalendarService = $googleCalendarService;
+    }
+
+    /**
+     * Getting Client Id And Active Id field Form The Request.
+     *
+     * @param Illuminate\Http\Request;
+     */
     public function confirmBooking(Request $request)
     {
-        // Validate the incoming request
-        $request->validate([
+
+        $validatedData = $request->validate([
             'id' => 'required|integer',
             'is_active' => 'required|boolean',
         ]);
 
-        // Find the client by ID
-        $client = Client::find($request->id);
+        $client = Client::findOrFail($validatedData['id']);
 
-        if (!$client) {
-            return response()->json(['success' => false, 'message' => 'Client not found'], 404);
-        }
 
-        if ($client->is_active == $request->is_active) {
-            return response()->json(['success' => true, 'message' => 'No changes made to client status'], 200);
-        }
+        try {
 
-        $client->is_active = $request->is_active;
+            $client->is_active = $validatedData['is_active'];
+            $client->save();
 
-        if (!$client->save()) {
-            return response()->json(['success' => false, 'message' => 'Failed to update client status'], 500);
-        }
+            if ($client->is_active) {
 
-        if ($client->is_active) {
-
-            // Create the booking for the client
-            $booking = $client->booking()->create([
-                'booking_date' => $client->date,
-                'ceremony_date' => $client->date,
-            ]);
-
-            if ($booking) {
-                // Generate the username and password
-                $username = strtolower(str_replace(' ', '.', $client->name)) . '.' . $booking->id;
+                $booking = $this->createBookingForClient($client);
 
                 $password = Str::random(8);
 
-                // Create the user
-                $user = User::create([
-                    'name' => $client->name,
-                    'booking_id' => $booking->id,
-                    'role_name' => 'client',
-                    'username' => $username,
-                    'password' => bcrypt($password),
-                    'created_by' => auth()->id() ?? null,
-                ]);
+                $username = strtolower(str_replace(' ', '.', $client->name)) . '.' . $booking->id;
 
-                // Prepare the data for the email
-                $data = [
-                    'name' => $client->name,
-                    'email' => $client->email,
-                    'number' => $client->phone_number,
-                    'venue' => $client->venue,
-                    'date' => $client->date,
-                    'message' => 'Booking created successfully',
-                    'username' => $username,
-                    'password' => $password,
-                ];
+                $user = $this->createUserForBooking($client, $booking, $username, $password);
 
-                // Send the email to the client
-                Mail::to($client->email)->send(new BookingMail($data));
+                $this->sendBookingEmail($client->email, $this->prepareBookingEmailData($client, $user, $password, $username));
+
+                $this->createGoogleCalendarEvent($client);
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Booking and user created successfully!',
+                    'message' => 'Booking confirmed and calendar event created',
                     'booking' => $booking,
                     'user' => $user,
                 ]);
-                
-            } else {
-
-                return response()->json(['success' => false, 'message' => 'Failed to create the booking'], 500);
-            
             }
-        }
 
-        // If the client is not active, return a failure response
-        return response()->json(['success' => false, 'message' => 'Client is not active'], 400);
+            return response()->json([
+                'success' => true,
+                'message' => 'Client status updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Booking confirmation failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process booking'
+            ], 500);
+        }
+    }
+
+
+    /**
+     * Accepting The Client Model 
+     *
+     * @param App\Models\Client;;
+     */
+    private function createGoogleCalendarEvent(Client $client): bool
+    {
+        $startDateTime = Carbon::parse($client->date)->addHours(4)->setTimezone('Asia/Kolkata');
+        $endDateTime = $startDateTime->copy()->endOfDay();
+
+        return $this->googleCalendarService->createEvent([
+            'title' => 'Booking Confirmation',
+            'description' => 'Your booking has been confirmed',
+            'start_datetime' => $startDateTime->format('Y-m-d\TH:i:s'),
+            'end_datetime' => $endDateTime->format('Y-m-d\TH:i:s'),
+            'timezone' => 'Asia/Kolkata',
+            'attendees' => [$client->email, 'sameershafi83@gmail.com']
+        ]);
+    }
+
+    /**
+     * Accepting The Client Model 
+     *
+     * @param App\Models\Client;;
+     */
+
+    private function createBookingForClient(Client $client)
+    {
+        return $client->booking()->create([
+            'booking_date' => $client->date,
+            'ceremony_date' => $client->date,
+        ]);
+    }
+
+
+    /**
+     * Accepting The Client Model , Username, Password
+     *
+     * @param App\Models\Client, Password, Username
+     */
+
+    private function createUserForBooking(Client $client, $booking, $username, $password)
+    {
+        return User::create([
+            'name' => $client->name,
+            'booking_id' => $booking->id,
+            'role_name' => 'client',
+            'username' => $username,
+            'password' => bcrypt($password),
+            'created_by' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * Accepting The Client Model , Username, Password
+     *
+     * @param App\Models\Client, Password, Username
+     */
+    private function prepareBookingEmailData(Client $client,  $password, $username): array
+    {
+        return [
+            'name' => $client->name,
+            'email' => $client->email,
+            'number' => $client->phone_number,
+            'venue' => $client->venue,
+            'date' => $client->date,
+            'message' => 'Booking created successfully',
+            'username' => $username,
+            'password' => $password,
+        ];
+    }
+
+    /**
+     * Sending Mail To The User
+     *
+     * @param Password, Username
+     */
+    private function sendBookingEmail(string $email, array $data): void
+    {
+        try {
+            Mail::to($email)->send(new BookingMail($data));
+            Log::info('Booking email sent to ' . $email);
+        } catch (\Exception $e) {
+            Log::error('Error sending booking email: ' . $e->getMessage());
+        }
     }
 }

@@ -29,21 +29,6 @@
                                 <p>Dashboard</p>
                             </a>
                         </li>
-                        <li class="nav-section">
-                            <span class="sidebar-mini-icon">
-                                <i class="fa fa-ellipsis-h"></i>
-                            </span>
-                            <h4 class="text-section">Components</h4>
-                        </li>
-                       
-
-                        <li class="nav-item {{ Request::is('client/view-flipbook') ? 'active' : ''}}">
-                            <a  href="{{url('client/view-flipbook')}}">
-                                <i class="fas fa-users"></i>
-                                <p>Flipbook</p>
-                            </a>
-                        </li>
-
                     </ul>
                 </div>
             </div>

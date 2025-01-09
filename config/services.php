@@ -35,12 +35,12 @@ return [
         ],
     ],
 
-   'google' => [
+    'google' => [
 
         'client_id' => env('GOOGLE_DRIVE_CLIENT_ID'),
-         'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
-         'client_refresh_token' => env('GOOGLE_DRIVE_REFRESH_TOKEN'),
-         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID')
-     ],
+        'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+        'redirect' => 'http://127.0.0.1:8000/auth/google/callback',
+        'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID')
+    ],
 
 ];

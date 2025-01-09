@@ -70,20 +70,31 @@
                                                         <i class="fas fa-trash text-danger "></i>
                                                     </button>
 
-                                                    <a class="btn btn-sm badge badge-success mt-2 me-1"
-                                                        href="javascript:void(0)" data-id="{{ $client->id }}"
-                                                        data-status="1" onclick="updateBooking(this)">Accept</a>
+                                                    @if (!$client->is_active)
+                                                        <form method="POST" action="{{ route('confirm-bookings') }}" class="d-inline">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <input type="hidden" name="id"
+                                                                value="{{ $client->id }}">
+                                                            <input type="hidden" name="is_active" value="1">
+                                                            <button type="submit"
+                                                                class="btn btn-sm badge badge-success mt-2 me-1">Accept</button>
+                                                        </form>
 
-                                                    <a class="btn btn-sm badge badge-danger mt-2"
-                                                        href="javascript:void(0)" data-id="{{ $client->id }}"
-                                                        data-status="0" onclick="updateBooking(this)">Cancel</a>
 
+                                                        <a class="btn btn-sm badge badge-success mt-2 me-1"
+                                                            href="javascript:void(0)" data-id="{{ $client->id }}"
+                                                            data-status="1" onclick="updateBooking(this)">Accept</a>
+                                                        <a class="btn btn-sm badge badge-danger mt-2"
+                                                            href="javascript:void(0)" data-id="{{ $client->id }}"
+                                                            data-status="0" onclick="updateBooking(this)">Cancel</a>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
                                     @else
                                         <tr>
-                                            <td colspan="7" class="text-center text-danger fw-bold">No Records
+                                            <td colspan="8" class="text-center text-danger fw-bold">No Records
                                                 Found...
                                             </td>
                                         </tr>
@@ -116,7 +127,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="clientForm">
-                        
+
                         @csrf
 
                         <input type="hidden" id="client_id" name="client_id">
@@ -175,6 +186,7 @@
     @push('scripts')
         <script>
             function updateBooking(button) {
+
                 let bookingId = $(button).data('id');
                 let status = $(button).data('status');
 
@@ -204,14 +216,15 @@
                         // Make the AJAX request
                         $.ajax({
                             url: '/admin/confirm-bookings',
-                            type: 'POST',
+                            type: 'PUT', 
                             data: {
                                 id: bookingId,
                                 is_active: status,
-                                _token: '{{ csrf_token() }}',
-                                _method: 'PUT',
+                                _token: '{{ csrf_token() }}'
                             },
                             success: function(response) {
+                                console.log(response);
+
                                 if (response.success) {
                                     swal({
                                         title: "Success!",

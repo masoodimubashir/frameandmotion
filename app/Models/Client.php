@@ -22,8 +22,8 @@ class Client extends Model
         'updated_by'
     ];
 
-    // public function booking(): HasOne
-    // {
-    //     return $this->hasOne(Booking::class);
-    // }
+    public function booking(): HasOne
+    {
+        return $this->hasOne(Booking::class);
+    }
 }

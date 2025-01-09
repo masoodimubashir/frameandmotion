@@ -71,12 +71,7 @@
 
                 </li>
 
-                <li class="nav-item {{ Request::is('admin/view-milestone') ? 'active' : '' }}">
-                    <a href="{{ url('admin/view-milestone') }}">
-                        <i class="fas fa-users"></i>
-                        <p>Milestone</p>
-                    </a>
-                </li>
+              
                
 
             </ul>

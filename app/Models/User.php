@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\File;
 
 class User extends Authenticatable
 {
@@ -28,9 +29,16 @@ class User extends Authenticatable
         'created_by',
         'updated_by',
         'role_name',
+        'google_id',
+        'google_access_token',
+        'google_refresh_token',
+        'token_updated_at'
+
+
 
     ];
 
+    
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -66,10 +74,11 @@ class User extends Authenticatable
 
     public function files(): HasMany
     {
-        return $this->hasMany(File::class);
+        return $this->hasMany(File::class, 'user_id', 'id');
     }
 
-    public function milestones(): HasMany{
+    public function milestones(): HasMany
+    {
         return $this->hasMany(Milestone::class);
     }
 }

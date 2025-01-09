@@ -1,66 +1,98 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Public Routes
+These routes are publicly accessible to users who are not logged in.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+GET / - Displays the welcome page and login form.
 
-## About Laravel
+Controller: AuthController@welcome
+Route Name: login
+POST /login - Handles user login.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Controller: AuthController@login
+GET /logout - Logs the user out.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Controller: AuthController@logout
+Admin Routes
+These routes are prefixed with /admin and are only accessible to authenticated admin users. They also require a valid Google token.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Dashboard & Admin Management
+GET /admin/dashboard - Displays the admin dashboard.
 
-## Learning Laravel
+Controller: DashboardController@dashboard
+GET /admin/edit-admin - Displays the form to edit admin details.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Controller: DashboardController@show
+PUT /admin/edit-admin-name/{id} - Updates the admin's name and username.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Controller: DashboardController@editNameUsername
+PUT /admin/edit-admin-password/{id} - Updates the admin's password.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Controller: DashboardController@editPassword
+User and Client Management
+Resource Routes for /admin/clients - CRUD operations for managing clients.
 
-## Laravel Sponsors
+Controller: ClientsController
+Resource Routes for /admin/bookings - CRUD operations for managing bookings.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Controller: BookingsController
+Resource Routes for /admin/users - CRUD operations for managing users.
 
-### Premium Partners
+Controller: UserController
+Flipbook Management
+GET /admin/view-flipbook - Displays all clients and their flipbooks.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+Controller: FlipBookController@show
+Resource Routes for /admin/flipbook - CRUD operations for managing flipbooks.
 
-## Contributing
+Controller: FLipBookController
+DELETE /admin/flipbook - Deletes a flipbook.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Controller: FLipBookController@destroy
+File Management
+Resource Routes for /admin/files - CRUD operations for managing files.
 
-## Code of Conduct
+Controller: FileController
+GET /admin/download-drive-images - Downloads images from Google Drive.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Controller: FileDownloadController@downloadImage
+Booking Management
+PUT /admin/confirm-bookings - Confirms bookings made by clients.
+Controller: AcceptBookingController@confirmBooking
+Route Name: confirm-bookings
+Google Routes
+These routes handle Google OAuth and calendar operations.
 
-## Security Vulnerabilities
+GET /create-event - Allows the user to create a new event on Google Calendar.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Controller: GoogleController@createEvent
+GET /auth/google/redirect - Redirects to Google for OAuth authentication.
 
-## License
+Controller: GoogleController@redirectToGoogle
+Route Name: google.redirect
+GET /auth/google/callback - Handles the callback after Google OAuth authentication.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Controller: GoogleController@handleGoogleCallback
+Route Name: google.callback
+Client Routes
+These routes are prefixed with /client and are only accessible to authenticated client users. They also require a valid Google token.
+
+GET /client/view-flipbook - Displays the client's flipbook page.
+
+Controller: UserFlipBoardController@show
+GET /client/dashboard - Displays the client dashboard.
+
+Controller: ClientDashboardController@dashboard
+GET /client/get-milestone - Fetches the client's milestone data.
+
+Controller: ClientDashboardController@getMilestone
+Front-End Routes
+These routes are for the front-end user booking interface.
+
+GET /front-bookings - Displays the booking form.
+
+View: front-end-bookings
+POST /book - Sends booking email after form submission.
+
+Controller: BookingMailController@sendBookMail
+POST /FormDetail - Sends form details after submission.
+
+Controller: BookingMailController@getFormDetails

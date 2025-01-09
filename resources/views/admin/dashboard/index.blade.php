@@ -1,4 +1,10 @@
 <x-app-layout>
+
+    <a href="{{ url('auth/google/redirect') }}">Google Sign In</a>
+    <a href="{{ url('/create-event') }}">create booking</a>
+
+
+
     <div class="page-inner">
         <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
             <div>

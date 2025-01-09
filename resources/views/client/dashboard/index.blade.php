@@ -120,6 +120,18 @@
             border-radius: 50%;
             margin-top: 15px;
         }
+
+        .timeline {
+            position: relative;
+        }
+
+        .spinner-container {
+            position: absolute;
+            bottom: -30px;
+            /* Adjust this to control the distance below the timeline */
+            left: 50%;
+            transform: translateX(-50%);
+        }
     </style>
 
     <div class="page-inner">
@@ -154,11 +166,19 @@
 
                 <div class="timeline-header">
                     <h1>Our Progress Milestone</h1>
-                    <p>Watch where a journey can take us</p>
                 </div>
 
                 <div class="timeline">
+                    <div id="timelineLoader" style="display: none;" class="text-center my-4">
+                        <p class="mt-2">Loading timeline...</p>
+                        <div class="spinner-container">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
 
 
             </div>
@@ -170,12 +190,15 @@
     @push('scripts')
         <script>
             function loadMilestoneTimeline() {
+                // Show loader before making the request
+                $('#timelineLoader').show();
+
                 $.ajax({
-                    url: '/client/get-milestone', // Your route URL
+                    url: '/client/get-milestone',
                     method: 'GET',
                     success: function(response) {
-
-                        $('.timeline').empty(); // Clear existing timeline items
+                        // Clear existing content
+                        $('.timeline').empty();
 
                         response.forEach(function(milestone) {
                             // Format date
@@ -190,28 +213,34 @@
 
                             // Create timeline item HTML
                             const timelineItem = `
-                                <div class="timeline-item ${side}">
-                                    <div class="content">
-                                        <h2>${milestone.name}</h2>
-                                        <p>${milestone.description}</p>
-                                        <div class="status">
-                                            ${milestone.is_in_progress ? '<span class="badge bg-info">In Progress</span>' : ''}
-                                            ${milestone.is_completed ? '<span class="badge bg-success">Completed</span>' : ''}
-                                        </div>
-                                        ${milestone.start_date ? `<p class="small">Started: ${new Date(milestone.start_date).toLocaleDateString()}</p>` : ''}
-                                        ${milestone.completion_date ? `<p class="small">Completed: ${new Date(milestone.completion_date).toLocaleDateString()}</p>` : ''}
-                                    </div>
-                                    <span class="date">${date}</span>
-                                </div>
-                             `;
+                    <div class="timeline-item ${side}">
+                        <div class="content">
+                            <h2>${milestone.name}</h2>
+                            <p>${milestone.description}</p>
+                            <div class="status">
+                                ${milestone.is_in_progress ? '<span class="badge bg-info">In Progress</span>' : ''}
+                                ${milestone.is_completed ? `
+                                                            <span class="badge bg-success">Completed</span>
+                                                            <a href="{{ url('/client/view-flipbook') }}" class="btn btn-link">View Your Flipbook</a>
+                                                        ` : ''}
+                            </div>
+                            ${milestone.start_date ? `<p class="small">Started: ${new Date(milestone.start_date).toLocaleDateString()}</p>` : ''}
+                            ${milestone.completion_date ? `<p class="small">Completed: ${new Date(milestone.completion_date).toLocaleDateString()}</p>` : ''}
+                        </div>
+                        <span class="date">${date}</span>
+                    </div>
+                `;
 
                             $('.timeline').append(timelineItem);
                         });
                     },
                     error: function(xhr) {
                         console.error('Error loading milestones:', xhr);
-                        // Show error message to user
                         $('.timeline').html('<div class="alert alert-danger">Error loading milestones</div>');
+                    },
+                    complete: function() {
+                        // Hide loader after request is complete (whether success or error)
+                        $('#timelineLoader').hide();
                     }
                 });
             }

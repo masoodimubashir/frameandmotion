@@ -175,8 +175,9 @@
                         success: function(response) {
 
                             $('#clientModal').modal('hide');
+                            fetchMilestones();
 
-                            Swal({
+                            swal({
                                 title: "Success!",
                                 text: "Milestone created successfully.",
                                 icon: "success",
@@ -186,7 +187,6 @@
                                 }
                             });
 
-                            loadMilestones();
                         },
                         error: function(xhr) {
                             if (xhr.status === 422) {
@@ -198,7 +198,7 @@
                                 });
 
                             } else {
-                                Swal({
+                                swal({
                                     title: "Error!",
                                     text: "Failed to create milestone.",
                                     icon: "error",
@@ -219,56 +219,60 @@
                     $('.invalid-feedback').empty();
                 }
 
-                fetchMilestones(); // Fetch the first page of milestones
 
-                $(document).on('click', '.deletemilestone', function() {
 
-                    const milestoneId = $(this).data('id');
 
-                    swal({
-                        title: "Are you sure?",
-                        text: "Once deleted, this milestone cannot be recovered!",
-                        icon: "warning",
-                        buttons: ["Cancel", "Delete"],
-                        dangerMode: true,
-                    }).then((willDelete) => {
-                        if (willDelete) {
-                            // Perform the AJAX DELETE request
-                            $.ajax({
-                                url: `/admin/milestone/${milestoneId}`,
-                                method: 'DELETE',
-                                headers: {
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                                },
-                                success: function(response) {
-                                    // Handle successful deletion
-                                    swal({
-                                        title: 'Deleted!',
-                                        text: 'The milestone has been deleted.',
-                                        icon: 'success',
-                                        confirmButtonText: 'OK'
-                                    });
+                fetchMilestones();
 
-                                    // Remove the milestone row from the table
-                                    $(`#milestone-row-${milestoneId}`).remove();
-                                },
-                                error: function(xhr) {
 
-                                    swal({
-                                        title: "Error!",
-                                        text: "Failed to delete milestone.",
-                                        icon: "error",
-                                        confirmButtonText: "OK",
-                                        customClass: {
-                                            confirmButton: "btn btn-danger"
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
+            });
+
+            $(document).on('click', '.deletemilestone', function() {
+
+                const milestoneId = $(this).data('id');
+
+                swal({
+                    title: "Are you sure?",
+                    text: "Once deleted, this milestone cannot be recovered!",
+                    icon: "warning",
+                    buttons: ["Cancel", "Delete"],
+                    dangerMode: true,
+                }).then((willDelete) => {
+                    if (willDelete) {
+                        // Perform the AJAX DELETE request
+                        $.ajax({
+                            url: `/admin/milestone/${milestoneId}`,
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            success: function(response) {
+                                // Handle successful deletion
+                                swal({
+                                    title: 'Deleted!',
+                                    text: 'The milestone has been deleted.',
+                                    icon: 'success',
+                                    confirmButtonText: 'OK'
+                                });
+
+                                // Remove the milestone row from the table
+                                $(`#milestone-row-${milestoneId}`).remove();
+                            },
+                            error: function(xhr) {
+
+                                swal({
+                                    title: "Error!",
+                                    text: "Failed to delete milestone.",
+                                    icon: "error",
+                                    confirmButtonText: "OK",
+                                    customClass: {
+                                        confirmButton: "btn btn-danger"
+                                    }
+                                });
+                            }
+                        });
+                    }
                 });
-
             });
 
             // Function to get the userId from the URL
@@ -286,13 +290,11 @@
                     url: `/admin/milestone/${userId}?page=${page}`, // Include page query parameter
                     method: 'GET',
                     success: function(response) {
-                        console.log(response); // Log the full response to check its structure
 
                         $('#milestone-table-body').empty(); // Clear the table body before appending new rows
 
                         response.user.milestones.forEach(function(milestone) {
 
-                            console.log(milestone);
 
                             const formatDate = (dateString) => {
                                 return dateString ? new Date(dateString).toLocaleDateString() :
@@ -337,7 +339,6 @@
                         setupPagination(response.user.milestones);
                     },
                     error: function(xhr) {
-                        console.error('Error loading milestones:', xhr);
                         // Show error message if needed
                         Swal({
                             title: "Error!",
@@ -369,10 +370,6 @@
                     );
                 }
             }
-
-
-
-
 
             //  Edit The Milestoen here
 

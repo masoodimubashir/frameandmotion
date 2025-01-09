@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client as ModelsClient;
 use App\Models\File;
 use App\Models\User;
-use Google\Service\Drive;
-use Google\Client;
+use App\Service\GoogleDriveService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -14,39 +14,30 @@ use Illuminate\Support\Facades\Validator;
 
 class FLipBookController extends Controller
 {
-    private $drive;
+    private $driveService;
 
-    public function __construct()
+    public function __construct(GoogleDriveService $googleDriveService)
     {
-        $client = new Client();
-        $client->setClientId(config('services.google.client_id'));
-        $client->setClientSecret(config('services.google.client_secret'));
-        $client->refreshToken(config('services.google.client_refresh_token'));
-
-        $this->drive = new Drive($client);
+        $this->driveService = $googleDriveService;
     }
 
     public function index(Request $request)
     {
         try {
-
-            // Get users who have files
+            
             $users = User::whereIn('id', File::select('user_id')->distinct())
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get();
 
             if ($request->ajax()) {
-
                 $query = File::query();
 
-                // Apply user filter if provided
                 if ($request->has('user_id') && $request->user_id) {
                     $query->where('user_id', $request->user_id);
                 }
 
-                // Get paginated results
-                $files = $query->with('user') // Eager load user relationship
+                $files = $query->with('user')
                     ->orderBy('created_at', 'desc')
                     ->paginate(12);
 
@@ -57,288 +48,140 @@ class FLipBookController extends Controller
                 ]);
             }
 
-    
         } catch (\Exception $e) {
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to fetch images: ' . $e->getMessage()
-                ], 500);
-            }
-
-            return back()->with('error', 'Failed to load images: ' . $e->getMessage());
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => $e->getMessage()], 500)
+                : back()->with('error', $e->getMessage());
         }
     }
 
     public function store(Request $request)
     {
+
+
+        $validation = Validator::make($request->all(), [
+            'user_id' => ['required', 'exists:users,id'],
+            'images' => ['required', 'array', 'min:1'],
+            'images.*' => ['required', 'image', 'mimes:jpeg,png,jpg'],
+        ]);
+
+        if ($validation->fails()) {
+            return response()->json(['errors' => $validation->errors()], 422);
+        }
+
         try {
-
-            $validation = Validator::make($request->all(), [
-
-                'user_id' => ['required', 'exists:users,id'],
-                'images' => ['required', 'array', 'min:1'],
-                'images.*' => [
-                    'required',
-                    'image',
-                    'mimes:jpeg,png,jpg',
-                ]
-            ]);
-
-            if ($validation->fails()) {
-                return response()->json(['errors' => $validation->errors()], 422);
-            }
-
 
             $userId = $request->user_id;
 
-            // Search for the folder with the current user_id
-            $query = sprintf(
-                "name = '%s' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-                $userId
-            );
+            $parentFolderId = '17FPmHjZCS0512fTOx99gqYOUIAAjio8P';
 
-            $existingFolders = $this->drive->files->listFiles([
-                'q' => $query,
-                'fields' => 'files(id, name)'
-            ]);
+            // Find or create user folder
+            $query = sprintf("name = '%s' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", $userId);
+            $folder = $this->driveService->searchFolders($query) ?? $this->driveService->createFolder($userId, $parentFolderId);
 
-            $driveFolderId = null;
-
-            if (count($existingFolders->files) > 0) {
-                // Folder exists, get its ID
-                $driveFolderId = $existingFolders->files[0]->id;
-            } else {
-                // Folder doesn't exist, create a new one
-                $newFolder = $this->drive->files->create(
-                    new Drive\DriveFile([
-                        'name' => $userId,
-                        'mimeType' => 'application/vnd.google-apps.folder',
-                        'parents' => [config('services.google.folder_id')]
-                    ]),
-                    ['fields' => 'id, name']
-                );
-
-                $driveFolderId = $newFolder->id;
-            }
-
-            // Upload images to the folder
             foreach ($request->file('images') as $file) {
-
                 $fileName = time() . '_' . $file->getClientOriginalName();
-
-                $uploadedFile = $this->drive->files->create(
-                    new Drive\DriveFile([
-                        'name' => $fileName,
-                        'parents' => [$driveFolderId]
-                    ]),
-                    [
-                        'data' => file_get_contents($file->getRealPath()),
-                        'mimeType' => $file->getMimeType(),
-                        'uploadType' => 'multipart',
-                        'fields' => 'id, name, webViewLink'
-                    ]
+                $uploadedFile = $this->driveService->uploadFile(
+                    $fileName,
+                    file_get_contents($file->getRealPath()),
+                    $file->getMimeType(),
+                    $folder->id
                 );
 
-                // Save file metadata to the database
                 File::create([
                     'name' => $fileName,
                     'drive_id' => $uploadedFile->id,
-                    'folder_id' => $driveFolderId,
+                    'folder_id' => $folder->id,
                     'user_id' => $userId,
                     'drive_link' => $uploadedFile->webViewLink,
-                    'mime_type' => $file->getMimeType()
+                    'mime_type' => $file->getMimeType(),
                 ]);
             }
 
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'message' => 'Files uploaded successfully']);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Upload failed: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Upload failed: ' . $e->getMessage()], 500);
         }
-    }
-
-
-    public function show($id)
-    {
-        $image = File::findOrFail($id);
-        $file = $this->drive->files->get($image->drive_id, ['fields' => 'webContentLink']);
-        return response()->json(['download_url' => $file->webContentLink]);
     }
 
     public function update(Request $request, $id)
     {
+        $validation = Validator::make($request->all(), [
+            'user_id' => ['required', 'exists:users,id'],
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg'],
+        ]);
 
-
+        if ($validation->fails()) {
+            return response()->json(['errors' => $validation->errors()], 422);
+        }
 
         try {
-            // Retrieve the file record from the database
             $file = File::findOrFail($id);
 
-            // Validate the uploaded image
-            $validation = Validator::make($request->all(), [
-                'user_id' => ['required', 'exists:users,id'],
-                'image' => ['required', 'image', 'mimes:jpeg,png,jpg', 'min:1']
-            ]);
-
-            if ($validation->fails()) {
-                return response()->json([
-                    'errors' => $validation->errors()
-                ], 422);
-            }
-
-            // Get the folder ID of the existing image
-            $userFolderId = $file->folder_id;
-
-            if (!$userFolderId) {
-                return response()->json(['error' => 'Folder ID not found for the file'], 404);
-            }
-
-            // Validate that the folder ID exists directly
-            try {
-                $folder = $this->drive->files->get($userFolderId, ['fields' => 'id']);
-            } catch (\Google\Service\Exception $e) {
-                return response()->json(['error' => 'User folder not found on Google Drive'], 404);
-            }
-
-            $this->drive->files->delete($file->drive_id);
-
+            // Delete the old file
+            $this->driveService->deleteFile($file->drive_id);
             $file->delete();
 
-            // Store the new image temporarily
             $newFile = $request->file('image');
-
             $newFileName = time() . '_' . $newFile->getClientOriginalName();
 
-            $newFilePath = $newFile->storeAs('temp', $newFileName);
+            // Upload the new file
+            $uploadedFile = $this->driveService->uploadFile(
+                $newFileName,
+                file_get_contents($newFile->getRealPath()),
+                $newFile->getMimeType(),
+                $file->folder_id
+            );
 
-            // Upload the new image to the same folder in Google Drive
-            $fileMetadata = new \Google\Service\Drive\DriveFile([
+            $file->update([
                 'name' => $newFileName,
-                'parents' => [$userFolderId] // Use the same folder ID
+                'drive_id' => $uploadedFile->id,
+                'drive_link' => $uploadedFile->webViewLink,
+                'mime_type' => $newFile->getMimeType(),
             ]);
 
-            $content = Storage::get('temp/' . $newFileName);
-
-            $driveFile = $this->drive->files->create($fileMetadata, [
-                'data' => $content,
-                'mimeType' => Storage::mimeType('temp/' . $newFileName),
-                'uploadType' => 'multipart',
-                'fields' => 'id, webViewLink'
-            ]);
-
-            // Save the new image details in the database
-            File::create([
-                'name' => $newFileName,
-                'drive_id' => $driveFile->id,
-                'folder_id' => $userFolderId,
-                'user_id' => $request->user_id,
-                'drive_link' => $driveFile->webViewLink,
-                'mime_type' => Storage::mimeType('temp/' . $newFileName),
-                'view_link' => $driveFile->webViewLink
-            ]);
-
-            // Clean up the temporary file
-            Storage::delete('temp/' . $newFileName);
-
-            return response()->json(['message' => 'Image updated successfully']);
+            return response()->json(['message' => 'File updated successfully']);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Unable to update image: ' . $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
-
-
-
-
     public function destroy(Request $request)
     {
+        $validation = Validator::make($request->all(), [
+            'images' => ['required', 'string'],
+        ]);
+
+        if ($validation->fails()) {
+            return response()->json(['success' => false, 'message' => $validation->errors()->first()], 422);
+        }
 
         try {
-            $validation = Validator::make($request->all(), [
-                'images' => ['required', 'string'], // JSON string of image data
-            ]);
-
-            if ($validation->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validation->errors()->first()
-                ], 422);
-            }
-
-            // Decode the JSON string of images
             $images = json_decode($request->images, true);
 
             if (!is_array($images) || empty($images)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No images provided for deletion'
-                ], 422);
+                return response()->json(['success' => false, 'message' => 'No images provided for deletion'], 422);
             }
 
             DB::beginTransaction();
 
-            $deletedCount = 0;
-            $errors = [];
-
             foreach ($images as $image) {
-                try {
-                    // Find the file in database
-                    $file = File::where('id', $image['id'])
-                        ->where('drive_id', $image['drive_id'])
-                        ->first();
+                $file = File::where('id', $image['id'])->where('drive_id', $image['drive_id'])->first();
 
-                    if (!$file) {
-                        $errors[] = "File with ID {$image['id']} not found";
-                        continue;
-                    }
-
-                    // Delete from Google Drive
-                    try {
-                        $this->drive->files->delete($file->drive_id);
-                    } catch (\Google\Service\Exception $e) {
-                        // If file doesn't exist in Drive, we'll still continue to delete from DB
-                        if ($e->getCode() !== 404) {
-                            $errors[] = "Failed to delete file {$file->name} from Drive: " . $e->getMessage();
-                            continue;
-                        }
-                    }
-
-                    // Delete from database
-                    $file->delete();
-                    $deletedCount++;
-                } catch (\Exception $e) {
-                    $errors[] = "Error processing file {$image['id']}: " . $e->getMessage();
+                if (!$file) {
+                    continue;
                 }
+
+                $this->driveService->deleteFile($file->drive_id);
+                $file->delete();
             }
 
-            if ($deletedCount > 0) {
-                DB::commit();
+            DB::commit();
 
-                return response()->json([
-                    'success' => true,
-                    'message' => "$deletedCount files deleted successfully" .
-                        (count($errors) > 0 ? " with " . count($errors) . " errors" : ""),
-                    'errors' => $errors
-                ]);
-            } else {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No files were deleted',
-                    'errors' => $errors
-                ], 500);
-            }
+            return response()->json(['success' => true, 'message' => 'Files deleted successfully']);
         } catch (\Exception $e) {
             DB::rollBack();
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Delete operation failed: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }

@@ -17,6 +17,10 @@ return new class extends Migration
             $table->foreignId('booking_id')->nullable()->constrained('bookings')->cascadeOnDelete();
             $table->enum('role_name', ['admin', 'client'])->default('client');
             $table->string('username')->unique();
+            $table->text('google_id')->nullable();
+            $table->text('google_access_token')->nullable();
+            $table->text('google_refresh_token')->nullable();
+            $table->text('token_updated_at')->nullable();
             $table->string('password');
             $table->timestamps();
             $table->unsignedTinyInteger('created_by')->nullable();

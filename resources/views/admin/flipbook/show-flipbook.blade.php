@@ -71,7 +71,6 @@
             <div class="col-12">
 
 
-
                 <div class="d-flex justify-content-end align-items-center">
                     <div>
                         <button type="button" class="btn btn-primary d-flex align-items-center gap-2"
@@ -139,7 +138,12 @@
                             <label for="user_id">Users</label>
                             <select v-model="selectedUser" style="cursor: pointer" class="form-control" id="user_id"
                                 name="user_id">
+
                                 <option value="" disabled selected>Select User</option>
+
+                                @foreach ($users as $user)
+                                    <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                @endforeach
 
                             </select>
                         </div>
@@ -254,578 +258,189 @@
 
     @push('scripts')
         <script>
+            function loadImages() {
+
+
+
+                $('#loadingButton').show();
+
+                let url = `{{ url('/admin/flipbook') }}`;
+
+                $.get(url, function(response) {
+
+                    $('#tableContainer').empty();
+
+                    const files = response.files;
+
+                    $('#loadingButton').hide();
+
+                    // Select All Container
+                    const selectAllContainer = $('<div>').addClass('mb-3');
+                    const selectAllWrapper = $('<div>').addClass('d-flex align-items-center');
+                    const selectAllCheckbox = $('<input>')
+                        .attr('type', 'checkbox')
+                        .attr('id', 'selectAll')
+                        .addClass('me-2')
+                        .css({
+                            'width': '20px',
+                            'height': '20px'
+                        });
+                    const selectAllLabel = $('<label>')
+                        .attr('for', 'selectAll')
+                        .addClass('form-check-label fs-5')
+                        .text('Select All');
+
+                    selectAllWrapper.append(selectAllCheckbox, selectAllLabel);
+                    selectAllContainer.append(selectAllWrapper);
+                    $('#tableContainer').append(selectAllContainer);
+
+                    // Create image cards
+                    let cardContainer = $('<div>').addClass('row');
+
+                    files.data.forEach(function(file) {
+                        let cardWrapper = $('<div>').addClass('col-4');
+                        let card = $('<div>').addClass('h-100 position-relative');
+
+                        // Preview Image
+                        let preview = $('<img>')
+                            .attr('src', `https://lh3.google.com/u/0/d/${file.drive_id}`)
+                            .addClass('card-img-top')
+                            .css({
+                                'object-fit': 'cover',
+                                'height': '300px',
+                                'border-radius': '0.5rem',
+                                'box-shadow': '0px 0px 2px black'
+                            });
+
+                        // Image Checkbox
+                        let checkbox = $('<input>')
+                            .attr('type', 'checkbox')
+                            .addClass('image-checkbox form-check-input position-absolute top-0 start-0 m-2')
+                            .attr('data-id', file.id)
+                            .attr('data-drive-id', file.drive_id)
+                            .css({
+                                'z-index': '2',
+                                'width': '20px',
+                                'height': '20px'
+                            });
+
+                        // Append image and checkbox to card
+                        card.append(checkbox, preview);
+                        cardWrapper.append(card);
+                        cardContainer.append(cardWrapper);
+                    });
+
+                    $('#tableContainer').append(cardContainer);
+
+                    // Pagination
+                    if (response.links) {
+                        let pagination = $('<div>').addClass('pagination-container mt-3');
+                        response.links.forEach(function(link) {
+                            let pageLink = $('<button>')
+                                .html(link.label)
+                                .addClass(link.active ? 'btn btn-primary mx-1' : 'btn btn-outline-primary mx-1')
+                                .prop('disabled', link.active)
+                                .click(function() {
+                                    if (!link.active) {
+                                        loadImages(link.url.split('page=')[1]);
+                                    }
+                                });
+                            pagination.append(pageLink);
+                        });
+                        $('#tableContainer').append(pagination);
+                    }
+
+                    // Handle select all functionality
+                    $('#selectAll').change(function() {
+                        const isChecked = $(this).prop('checked');
+                        $('.image-checkbox').prop('checked', isChecked);
+                        updateSelectionInfo();
+                    });
+
+                    // Update selection info on each checkbox change
+                    $('.image-checkbox').change(function() {
+                        updateSelectionInfo();
+                    });
+
+                    updateSelectionInfo();
+                }).fail(function() {
+                    $('#loadingButton').hide();
+                    swal("Error!", "Failed to load images.", "error");
+                });
+            }
+
+            // Function to update selection info
+            function updateSelectionInfo() {
+                const selectedCount = $('.image-checkbox:checked').length;
+                $('#selectedCount').text(selectedCount);
+                if (selectedCount === $('.image-checkbox').length) {
+                    $('#selectAll').prop('checked', true);
+                } else {
+                    $('#selectAll').prop('checked', false);
+                }
+            }
+
             $(document).ready(function() {
 
-
-
-
-
-                function loadUsers() {
-                    $.ajax({
-                        url: '/admin/flipbook',
-                        type: 'GET',
-                        success: function(response) {
-
-                            const users = response.users;
-
-                            const userDropdown = $('#user_id');
-
-                            userDropdown.empty();
-
-                            userDropdown.append(
-                                '<option value="" disabled selected>Select User</option>'
-                            );
-
-                            users.forEach(function(user) {
-                                userDropdown.append(
-                                    `<option value="${user.id}">${user.name}</option>`);
-                            });
-
-                        },
-                        error: function(xhr, status, error) {
-                            swal("Error!", "Failed To Load Users.", "error");
-
-                        },
-                    });
-                }
-
-                function fetchUsers() {
-                    $.ajax({
-                        url: '/admin/flipbook', // Your endpoint for fetching users
-                        type: 'GET',
-                        success: function(response) {
-
-                            const users = response.users;
-
-                            const userDropdown = $('#user'); // Target the select element
-
-                            userDropdown.empty(); // Clear existing options
-
-                            userDropdown.append(
-                                '<option value="" disabled selected>Select User</option>'
-                            ); // Default option
-
-                            // Populate the dropdown with user data
-                            users.forEach(function(user) {
-                                userDropdown.append(
-                                    `<option value="${user.id}">${user.name}</option>`);
-                            });
-                        },
-                        error: function(xhr, status, error) {
-                            swal("Error!", "Failed To Load Users.", "error");
-
-                        },
-                    });
-                }
-
-                // Initialize the page
+                // Initial load
                 loadImages();
 
-                // Handle filter change
-                $('#userFilter').on('change', function() {
-                    const selectedUserId = $(this).val();
-                    loadImages(1, selectedUserId);
-                    $('#clearFilter').toggle(!!selectedUserId);
-                });
-
-                // Handle clear filter
-                $('#clearFilter').on('click', function() {
-                    $('#userFilter').val('');
-                    loadImages(1);
-                    $(this).hide();
-                });
-
-                function loadImages(page = 1, userId = null) {
-                    $('#loadingButton').show();
-                    $('#tableContainer').addClass('loading');
-
-                    let url = `{{ url('/admin/flipbook') }}?page=${page}`;
-                    if (userId) {
-                        url += `&user_id=${userId}`;
-                    }
-
-                    $.get(url, function(response) {
-                        if (!response.success) {
-                            swal("Error!", response.message || "Failed to load images.", "error");
-                            return;
-                        }
-
-                        $('#tableContainer').empty();
-                        const files = response.files;
-                        $('#loadingButton').hide();
-                        $('#tableContainer').removeClass('loading');
-
-                        // Select All Section
-                        const selectAllContainer = $('<div>').addClass('mb-3 d-flex align-items-center');
-                        const selectAllCheckbox = $('<input>')
-                            .attr('type', 'checkbox')
-                            .attr('id', 'selectAll')
-                            .addClass('me-2 form-check-input')
-                            .css({
-                                'width': '25px',
-                                'height': '25px'
-                            });
-
-                        const selectAllLabel = $('<label>')
-                            .attr('for', 'selectAll')
-                            .addClass('form-check-label fs-5')
-                            .text('Select All');
-
-                        selectAllContainer.append(selectAllCheckbox, selectAllLabel);
-                        $('#tableContainer').append(selectAllContainer);
-
-                        // Create grid container
-                        let cardContainer = $('<div>').addClass('row g-4').css({
-                            'height': '600px',
-                            'overflow-y': 'scroll',
-                            'scrollbar-width': 'none', // For Firefox
-                            '-ms-overflow-style': 'none', // For Internet Explorer and Edge
-                            '&::-webkit-scrollbar': { // For Chrome, Safari, and Opera
-                                'display': 'none'
-                            }
-                        });
-
-                        files.data.forEach(function(file) {
-                            // Card wrapper with bootstrap grid
-                            let cardWrapper = $('<div>').addClass('col-sm-6 col-md-4 col-lg-3');
-
-                            // Main card container
-                            let card = $('<div>')
-                                .addClass('card')
-                                .css({
-                                    'position': 'relative',
-                                    'overflow': 'hidden',
-                                    'border': 'none',
-                                    'border-radius': '10px',
-                                    'box-shadow': '0 0 5px black'
-                                });
-
-                            // Controls overlay container
-                            let controlsOverlay = $('<div>')
-                                .addClass('position-absolute w-100 p-2 d-flex justify-content-between')
-                                .css({
-                                    'top': '0',
-                                    'left': '0',
-                                    'z-index': '2',
-                                    'background': 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 100%)'
-                                });
-
-                            // Edit button (top left)
-                            let editButton = $('<button>')
-                                .addClass('edit-button')
-                                .attr({
-                                    'data-id': file.id,
-                                    'data-name': file.name,
-                                    'data-drive-id': file.drive_id,
-                                    'data-user-id': file.user_id
-                                })
-                                .html('<i class="fas fa-edit fs-5"></i>')
-                                .css({
-                                    'background': '#4CAF50',
-                                    'border': 'none',
-                                    'border-radius': '50%',
-                                    'width': '40px',
-                                    'height': '40px',
-                                    'color': 'white',
-                                    'cursor': 'pointer',
-                                    'box-shadow': '0 2px 5px rgba(0,0,0,0.2)',
-                                    'opacity': '0.9',
-                                    'transition': 'all 0.3s ease',
-                                    'display': 'flex',
-                                    'align-items': 'center',
-                                    'justify-content': 'center',
-                                    'position': 'relative',
-                                    'overflow': 'hidden'
-                                })
-                                .hover(
-                                    function() { // Mouse enter
-                                        $(this).css({
-                                            'opacity': '1',
-                                            'transform': 'scale(1.05)',
-                                            'box-shadow': '0 4px 8px rgba(0,0,0,0.3)',
-                                            'background': '#45a049'
-                                        });
-                                    },
-                                    function() { // Mouse leave
-                                        $(this).css({
-                                            'opacity': '0.9',
-                                            'transform': 'scale(1)',
-                                            'box-shadow': '0 2px 5px rgba(0,0,0,0.2)',
-                                            'background': '#4CAF50'
-                                        });
-                                    }
-                                );
-
-                            // Checkbox container (top right)
-                            let checkbox = $('<input>')
-                                .attr({
-                                    'type': 'checkbox',
-                                    'data-id': file.id,
-                                    'data-drive-id': file.drive_id
-                                })
-                                .addClass('image-checkbox form-check-input fs-5')
-                                .css({
-                                    'transform': 'scale(1.2)',
-                                    'opacity': '0.9'
-                                });
-
-                            // Add controls to overlay
-                            controlsOverlay.append(editButton, checkbox);
-
-                            // Image container with aspect ratio
-                            let imageContainer = $('<div>')
-                                .addClass('position-relative')
-                                .css({
-                                    'height': '100%',
-                                    'min-height': '200px'
-                                });
-
-                            // Image element
-                            let preview = $('<img>')
-                                .attr('src', `https://lh3.google.com/u/0/d/${file.drive_id}`)
-                                .css({
-                                    'object-fit': 'cover',
-                                    'border-radius': '10px',
-                                    'width': '100%',
-                                    'height': '300px',
-                                    'cursor': 'pointer'
-                                });
-
-                            // Filename overlay at bottom
-                            let fileNameOverlay = $('<div>')
-                                .addClass('position-absolute bottom-0 w-100 p-2')
-                                .css({
-                                    'background': 'linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)',
-                                    'border-radius': '0 0 10px 10px'
-                                });
-
-                            // Assemble the card
-                            imageContainer.append(preview);
-                            card.append(controlsOverlay, imageContainer, fileNameOverlay);
-                            cardWrapper.append(card);
-                            cardContainer.append(cardWrapper);
-                        });
-
-                        $('#tableContainer').append(cardContainer);
-
-                        // Add pagination
-                        if (files.links && files.links.length > 3) {
-                            let pagination = $('<div>').addClass(
-                                'pagination-container mt-3 d-flex justify-content-center'
-                            );
-                            files.links.forEach(function(link) {
-                                let pageLink = $('<button>')
-                                    .html(link.label)
-                                    .addClass(link.active ? 'btn btn-primary mx-1' :
-                                        'btn btn-outline-primary mx-1')
-                                    .prop('disabled', link.active)
-                                    .click(function() {
-                                        if (!link.url) return;
-                                        const pageNum = link.url.split('page=')[1];
-                                        loadImages(pageNum, userId);
-                                    });
-                                pagination.append(pageLink);
-                            });
-                            $('#tableContainer').append(pagination);
-                        }
-
-                        // Update the URL without reloading the page
-                        const newUrl = new URL(window.location);
-                        if (userId) {
-                            newUrl.searchParams.set('user_id', userId);
-                        } else {
-                            newUrl.searchParams.delete('user_id');
-                        }
-                        window.history.pushState({}, '', newUrl);
-
-                    }).fail(function(xhr) {
-                        $('#loadingButton').hide();
-                        $('#tableContainer').removeClass('loading');
-                        swal("Error!", "Failed to load images.", "error");
-                    });
-                }
-
-                $('#uploadModalTrigger').click(function() {
-                    $('#uploadForm')[0].reset(); // Reset the upload form
-                    $('#uploadModalLabel').text('Upload Images'); // Set modal title
-                    $('#uploadModal').modal('show'); // Show the modal
-                });
-                // Upload Form
                 $('#uploadForm').on('submit', function(e) {
-                    e.preventDefault();
+                    e.preventDefault(); // Prevent the default form submission
+
+                    // Prepare form data
                     let formData = new FormData(this);
+                    console.log(formData);
+                    
 
                     $.ajax({
-                        url: '/admin/flipbook',
+                        url: `/admin/flipbook`, // Use the proper endpoint
                         type: 'POST',
                         data: formData,
-                        processData: false,
                         contentType: false,
-                        beforeSend: function(xhr) {
-                            xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
-                            $('.is-invalid').removeClass('is-invalid');
-                            $('.invalid-feedback').remove();
-                            $('#uploadForm button').prop('disabled', true).text('Uploading...');
+                        processData: false,
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                        },
+                        beforeSend: function() {
+                            // Optional: Show a loading spinner
+                            $('#uploadForm button[type="submit"]').prop('disabled', true).text(
+                                'Uploading...');
                         },
                         success: function(response) {
-                            if (response.success) {
-                                swal("Success!", "Files uploaded successfully!", "success").then(
-                                    () => {
-                                        $('#uploadModal').modal('hide');
-                                        $('#uploadForm')[0].reset();
-                                        loadImages();
-                                    });
-                            } else {
-                                swal("Error!", response.message || "Upload failed.", "error");
-                            }
-                            $('#uploadForm button').prop('disabled', false).text('Upload');
+                            // Handle success response
+                            alert(response.message || 'Files uploaded successfully!');
+
+                            // Optional: Reset the form
+                            $('#uploadForm')[0].reset();
+
+                            // Hide the modal
+                            $('#uploadModal').modal('hide');
                         },
                         error: function(xhr) {
+                            // Handle errors
                             if (xhr.status === 422) {
+                                // Validation errors
                                 const errors = xhr.responseJSON.errors;
-                                $.each(errors, function(field, messages) {
-                                    field = field.replace(/\./g, '[').split('[')[0];
-                                    const $input = $(
-                                        `[name="${field}"], [name="${field}[]"]`);
-                                    $input.addClass('is-invalid');
-                                    $input.after(
-                                        `<div class="invalid-feedback">${messages[0]}</div>`
-                                    );
-                                });
-                            } else {
-                                swal("Error!", "An unexpected error occurred.", "error");
-                            }
-                            $('#uploadForm button').prop('disabled', false).text('Upload');
-                        }
-                    });
-                });
+                                let errorMessages = '';
 
-                function fetchUsers() {
-                    $.ajax({
-                        url: '/admin/flipbook',
-                        method: 'GET',
-                        success: function(response) {
-                            const $dropdown = $('#user_id, #user'); // Target both dropdowns
-                            $dropdown.empty(); // Clear existing options
-                            $dropdown.append(new Option('Select User', '', true, true));
-
-                            const users = response.users;
-
-                            console.log(users);
-
-                            users.forEach(function(user) {
-                                $dropdown.append(new Option(user.name, user.id));
-                            });
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('Error fetching users:', error);
-                        }
-                    });
-                }
-
-                $(document).on('click', '.edit-button', function() {
-                    const userId = $(this).data('user-id'); // Add this data attribute to your edit button
-                    const imageId = $(this).data('id');
-                    const imageName = $(this).data('name');
-                    const driveId = $(this).data('drive-id');
-
-                    // Set form values
-                    $('#editImageId').val(imageId);
-                    $('#editImageName').val(imageName);
-                    $('#editDriveId').val(driveId);
-
-                    // Wait for users to be loaded then set selected user
-                    $('#user').val(userId);
-
-                    // Show modal
-                    $('#editImageModal').modal('show');
-                });
-
-
-                // Edit The Image
-                $(document).on('click', '.edit-button', function() {
-                    const imageId = $(this).data('id');
-                    const imageName = $(this).data('name');
-                    const driveId = $(this).data('drive-id');
-
-                    // Show edit form in modal
-                    $('#editImageModal').modal('show');
-                    $('#editImageId').val(imageId);
-                    $('#editImageName').val(imageName);
-                    $('#editDriveId').val(driveId); // Populate Drive ID, but make it disabled
-                });
-
-
-
-
-                $('#editImageForm').submit(function(e) {
-                    fetchUsers();
-                    e.preventDefault();
-
-                    let formData = new FormData(this);
-                    formData.append('_method', 'PUT');
-                    const imageId = $('#editImageId').val();
-                    const url = `/admin/flipbook/${imageId}`;
-
-                    $.ajax({
-                        url: url,
-                        type: 'POST',
-                        data: formData,
-                        processData: false,
-                        contentType: false,
-                        beforeSend: function(xhr) {
-                            xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
-                            // Clear previous errors
-                            $('.is-invalid').removeClass('is-invalid');
-                            $('.invalid-feedback').remove();
-                            $('.editButton').prop('disabled', true).text('Uploading...');
-                        },
-                        success: function(response) {
-                            swal("Success!", "Files uploaded successfully!", "success").then(() => {
-                                $('#editImageModal').modal('hide');
-                                $('#editImageForm')[0].reset();
-                                loadImages();
-                                $('.editButton').prop('disabled', false).text(
-                                    'Save Changes');
-                            });
-                        },
-                        error: function(xhr, status, error) {
-                            if (xhr.status === 422) {
-
-                                const errors = xhr.responseJSON.errors;
-                                console.log(errors);
-
-
-                                $.each(errors, function(field, messages) {
-
-                                    const $input = $(`[name="${field}"]`);
-                                    $input.addClass('is-invalid');
-                                    $input.after(
-                                        `<div class="invalid-feedback">${messages[0]}</div>`
-                                    );
-                                });
-                                $('.editButton').prop('disabled', false).text('Save Changes');
-                            } else {
-                                swal("Error!", "An unexpected error occurred.", "error");
-                                $('.editButton').prop('disabled', false).text('Save Changes');
-                            }
-                        }
-                    });
-                });
-
-
-                // Add Delete Selected button to the page
-                const deleteButtonContainer = $('<div>').addClass('mb-3 ms-3');
-                const deleteButton = $('<button>')
-                    .attr('id', 'deleteSelected')
-                    .addClass('btn btn-danger')
-                    .text('Delete Selected')
-                    .prop('disabled', true);
-                deleteButtonContainer.append(deleteButton);
-
-                // Add it after the select all container
-                $('#tableContainer').find('.mb-3').after(deleteButtonContainer);
-
-                // Handle delete selected functionality
-                $('#deleteSelected').click(function() {
-
-                    const selectedImages = $('.image-checkbox:checked').map(function() {
-                        return {
-                            id: $(this).data('id'),
-                            drive_id: $(this).data('drive-id')
-                        };
-                    }).get();
-
-                    if (selectedImages.length === 0) {
-                        swal("Warning!", "Please select at least one image to delete.", "error");
-                        return;
-                    }
-
-                    swal({
-                        title: "Are you sure?",
-                        text: `You are about to delete ${selectedImages.length} selected image(s). This action cannot be undone.`,
-                        icon: "warning",
-                        buttons: ["Cancel", "Delete"],
-                        dangerMode: true,
-                    }).then((willDelete) => {
-                        if (!willDelete) return;
-
-                        const formData = new FormData();
-                        formData.append('_method', 'DELETE');
-                        formData.append('images', JSON.stringify(selectedImages));
-
-                        $.ajax({
-                            url: '/admin/flipbook',
-                            type: 'POST',
-                            data: formData,
-                            processData: false,
-                            contentType: false,
-                            headers: {
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            },
-                            beforeSend: function() {
-                                swal({
-                                    title: 'Processing...',
-                                    text: 'Please wait while we delete the selected images.',
-                                    icon: 'info',
-                                    buttons: false,
-                                    closeOnClickOutside: false
-                                });
-                            },
-                            success: function(response) {
-                                swal.close();
-                                if (response.success) {
-                                    swal('Success!',
-                                        `Successfully deleted ${selectedImages.length} images.`,
-                                        'success'
-                                    ).then(() => {
-                                        loadImages(); // Reload the images
-                                    });
-                                } else {
-                                    swal("Error!", response.message ||
-                                        "Error deleting the images.", "error");
+                                for (const [key, messages] of Object.entries(errors)) {
+                                    errorMessages += `\n${key}: ${messages.join(', ')}`;
                                 }
-                            },
-                            error: function(xhr, status, error) {
-                                swal.close();
-                                let errorMessage = xhr.responseJSON?.message || xhr
-                                    .responseText || 'An unexpected error occurred.';
-                                swal("Error!", errorMessage, "error");
-                                console.error('Detailed error:', {
-                                    xhr,
-                                    status,
-                                    error
-                                });
+
+                                alert(`Validation Errors:${errorMessages}`);
+                            } else {
+                                alert(xhr.responseJSON.message ||
+                                    'An error occurred while uploading files.');
                             }
-                        });
+                        },
+                        complete: function() {
+                            // Re-enable the submit button
+                            $('#uploadForm button[type="submit"]').prop('disabled', false).text(
+                                'Upload');
+                        },
                     });
                 });
-
-                // Handle select all functionality
-                $(document).on('change', '#selectAll', function() {
-                    $('.image-checkbox').prop('checked', $(this).prop('checked'));
-                    updateDeleteButton();
-                });
-
-                // Handle individual checkbox changes
-                $(document).on('change', '.image-checkbox', function() {
-                    const allChecked = $('.image-checkbox').length === $('.image-checkbox:checked').length;
-                    $('#selectAll').prop('checked', allChecked);
-                    updateDeleteButton();
-                });
-
-                // Update delete button state
-                function updateDeleteButton() {
-                    const selectedCount = $('.image-checkbox:checked').length;
-                    $('#deleteSelected').text(
-                        selectedCount > 0 ? `Delete Selected (${selectedCount})` : 'Delete Selected'
-                    ).prop('disabled', selectedCount === 0);
-                }
-
-                // Initialize the page
-                fetchUsers();
-                loadUsers();
-
 
             });
         </script>

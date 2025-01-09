@@ -54,6 +54,7 @@ class UserFlipBoardController extends Controller
         
         $user = Auth::user();
 
+
         $query = $user->files()->orderBy('created_at');
 
         if ($request->filled(['start_date', 'end_date'])) {
@@ -65,6 +66,7 @@ class UserFlipBoardController extends Controller
         }
 
         $files = $query->paginate(10);
+
         return response()->json($files);
     }
 

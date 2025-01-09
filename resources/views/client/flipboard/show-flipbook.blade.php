@@ -1,58 +1,132 @@
 <x-app-layout>
 
     <style>
-        .loading-overlay {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
+        /* General page container styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fa;
+        }
+
+        /* Action buttons styling */
+        .d-flex {
+            margin-top: 20px;
+        }
+
+        /* Upload and View Flipbook buttons */
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: 600;
+            padding: 8px 20px;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            font-weight: 600;
+            padding: 8px 20px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        /* Container for the card and selection section */
+        #tableContainer {
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Select All checkbox styling */
+        .mb-3 {
+            margin-bottom: 20px;
+        }
+
+        .d-flex.align-items-center {
             display: flex;
             align-items: center;
-            justify-content: center;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 20px;
+        }
+
+        .form-check-label {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Card Container Grid */
+        .row.g-4 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        /* Card styles */
+        .card-img-top {
             border-radius: 8px;
-            font-size: 18px;
-            color: #333;
-        }
-
-        .loading-overlay i {
-            margin-right: 10px;
-        }
-
-        .card {
-            border: 1px solid #ddd;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .card:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .card-body {
-            background-color: #f8f9fa;
-            padding: 0.75rem;
-        }
-
-        .card-body p {
-            margin: 0;
-            font-size: 0.9rem;
-            color: #333;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            object-fit: cover;
+            height: 220px;
+            width: 100%;
         }
 
         .image-checkbox {
-            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 2;
+            width: 20px;
+            height: 20px;
         }
 
-        .select-all-container {
-            background-color: #f1f1f1;
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
+        /* Loading overlay styling */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 20px;
+            color: #007bff;
+        }
+
+        /* Pagination styling */
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .pagination-container button {
+            font-size: 16px;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border-radius: 5px;
+        }
+
+        .pagination-container button.btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .pagination-container button.btn-outline-primary {
+            background-color: transparent;
+            border: 1px solid #007bff;
+            color: #007bff;
+        }
+
+        .pagination-container button:disabled {
+            opacity: 0.6;
         }
     </style>
 
@@ -76,39 +150,28 @@
         </div>
 
         <div class="row">
-
             <div class="col-12">
-
-                <div class="d-flex align-items-center justify-content-end mb-3">
-
+                <!-- Action Buttons Container -->
+                <div class="d-flex align-items-center justify-content-end mb-4">
                     <button class="btn btn-primary me-2" id="uploadModalTrigger" data-toggle="modal"
                         data-target="#uploadModal">
-                        <i class="fas fa-regular fa-file-pdf"></i>
-
+                        <i class="fas fa-file-pdf"></i> Upload
                     </button>
-
-                    <!-- Add this after your existing buttons -->
-                    <button id="viewSelectedImages" class="btn btn-primary me-2" disabled>
+                    <button id="viewSelectedImages" class="btn btn-secondary me-2" disabled>
                         <i class="fas fa-eye"></i> View Flipbook
                     </button>
-
-                    <input type="date" id="dateRangePicker" class="form-control" />
-
-
                 </div>
 
-                <div id='tableContainer' style="min-height: 900px;">
-                </div>
+                <!-- Table Container (Image Cards & Select All) -->
+                <div id="tableContainer" style="min-height: 900px;"></div>
 
-                <!-- Loading Button -->
+                <!-- Loading Button (Overlay) -->
                 <div id="loadingButton" class="loading-overlay" style="display: none;">
                     <i class="fas fa-spinner fa-spin"></i> Loading...
                 </div>
-
-
             </div>
-
         </div>
+
 
     </div>
 
@@ -146,7 +209,7 @@
 
                 function addDateFilters() {
 
-                    const filterContainer = $('<div>').addClass('mb-3 d-flex gap-3 align-items-center');
+                    const filterContainer = $('<div>').addClass('d-flex flex-wrap align-items-center mb-4');
 
                     // Start Date Input
                     const startDateInput = $('<input>')
@@ -194,7 +257,6 @@
                 }
 
                 function loadImages(page = 1) {
-
                     $('#loadingButton').show();
 
                     const startDate = $('#startDate').val();
@@ -207,6 +269,7 @@
                     }
 
                     $.get(url, function(response) {
+                        console.log(response);
 
                         $('#tableContainer').empty();
 
@@ -215,14 +278,14 @@
                         $('#loadingButton').hide();
 
                         // Select All Container
-                        const selectAllContainer = $('<div>').addClass(' mb-3');
+                        const selectAllContainer = $('<div>').addClass('mb-3');
 
                         const selectAllWrapper = $('<div>').addClass('d-flex align-items-center');
 
                         const selectAllCheckbox = $('<input>')
                             .attr('type', 'checkbox')
                             .attr('id', 'selectAll')
-                            .addClass(' me-2')
+                            .addClass('me-2')
                             .css({
                                 'width': '20px',
                                 'height': '20px'
@@ -234,16 +297,15 @@
                             .text('Select All');
 
                         selectAllWrapper.append(selectAllCheckbox, selectAllLabel);
-
                         selectAllContainer.append(selectAllWrapper);
 
                         $('#tableContainer').append(selectAllContainer);
 
-                        let cardContainer = $('<div>').addClass('row g-4');
+                        let cardContainer = $('<div>').addClass('row');
 
                         files.data.forEach(function(file) {
-                            let cardWrapper = $('<div>').addClass('col-sm-6 col-md-4 col-lg-3');
-                            let card = $('<div>').addClass(' h-100 position-relative');
+                            let cardWrapper = $('<div>').addClass('col-4');
+                            let card = $('<div>').addClass('h-100 position-relative');
 
                             let preview = $('<img>')
                                 .attr('src', `https://lh3.google.com/u/0/d/${file.drive_id}`)
@@ -251,7 +313,6 @@
                                 .css({
                                     'object-fit': 'cover',
                                     'height': '300px',
-                                    'width': '100%',
                                     'border-radius': '0.5rem',
                                     'box-shadow': '0px 0px 2px black'
                                 });
@@ -269,7 +330,6 @@
                                     'height': '20px'
                                 });
 
-
                             card.append(checkbox, preview);
                             cardWrapper.append(card);
                             cardContainer.append(cardWrapper);
@@ -279,8 +339,7 @@
 
                         // Pagination
                         if (response.links) {
-                            let pagination = $('<div>').addClass(
-                                'pagination-container mt-3 d-flex justify-content-center');
+                            let pagination = $('<div>').addClass('pagination-container mt-3');
                             response.links.forEach(function(link) {
                                 let pageLink = $('<button>')
                                     .html(link.label)
@@ -304,12 +363,14 @@
                     });
                 }
 
+
                 function updateViewButton() {
                     const selectedCount = $('.image-checkbox:checked').length;
                     $('#viewSelectedImages').prop('disabled', selectedCount === 0);
                 }
 
                 $('#viewSelectedImages').click(function() {
+
                     const selectedCheckboxes = $('.image-checkbox:checked');
                     const carouselInner = $('#selectedImagesCarousel .carousel-inner');
                     carouselInner.empty();
@@ -379,20 +440,22 @@
                         url: '/client/flipbook',
                         method: 'POST',
                         data: JSON.stringify({
-                            files: selectedFiles, // Ensure files are correctly serialized
+                            files: selectedFiles,
                         }),
-                        contentType: 'application/json', // Make sure the server expects JSON
+                        contentType: 'application/json',
                         beforeSend: function(xhr) {
                             xhr.setRequestHeader('X-CSRF-TOKEN',
                                 '{{ csrf_token() }}'); // CSRF Token
-                            $('#uploadModalTrigger').prop('disabled', true).text('downloading...');
+                            $('#uploadModalTrigger').prop('disabled', true).text(
+                                'Generating PDF...');
                         },
                         success: function(response) {
+
                             if (response.success) {
                                 swal("Success!", "Your PDF has been generated successfully!",
                                         "success")
                                     .then(() => {
-                                        // Open PDF in a new tab (or initiate download if that's your goal)
+
                                         window.open(response.download_url, '_blank');
 
                                         $('#uploadModalTrigger').prop('disabled', false).html(
