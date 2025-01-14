@@ -150,51 +150,85 @@ class FileController extends Controller
     }
 
 
-    public function destroy($id)
+    public function destroy(Request $request)
     {
         try {
+            $selectedImages = $request->input('images', []);
 
+            if (empty($selectedImages)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No images selected for deletion'
+                ], 400);
+            }
 
-            $images = $request->input('images');
+            $processedFolders = [];
+            $deletedCount = 0;
 
-            $folderId = null;
-
-            foreach ($images as $image) {
-
+            foreach ($selectedImages as $image) {
                 $file = File::find($image['id']);
 
-                if ($file) {
+                if (!$file) {
+                    continue;
+                }
 
-                    $folderId = $file->folder_id;
-
+                try {
+                    // Delete file from Google Drive
                     $this->drive->files->delete($image['drive_id']);
 
+                    // Track the folder for potential cleanup
+                    if (!in_array($file->folder_id, $processedFolders)) {
+                        $processedFolders[] = $file->folder_id;
+                    }
+
+                    // Delete database record
                     $file->delete();
+                    $deletedCount++;
+                } catch (\Exception $e) {
+                    Log::error('Failed to delete file:', [
+                        'file_id' => $image['id'],
+                        'drive_id' => $image['drive_id'],
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue with other deletions even if one fails
                 }
             }
 
-            if ($folderId) {
-
+            // Clean up empty folders
+            foreach ($processedFolders as $folderId) {
                 $remainingFiles = File::where('folder_id', $folderId)->count();
 
                 if ($remainingFiles === 0) {
+                    try {
+                        // Delete folder from Google Drive
+                        $this->drive->files->delete($folderId);
 
-                    $folder = File::find($folderId);
-
-                    if ($folder) {
-                        $folder->delete();
+                        // Delete folder record if it exists in files table
+                        File::where('drive_id', $folderId)->delete();
+                    } catch (\Exception $e) {
+                        Log::error('Failed to delete folder:', [
+                            'folder_id' => $folderId,
+                            'error' => $e->getMessage()
+                        ]);
                     }
                 }
             }
 
+            $message = $deletedCount > 0
+                ? "Successfully deleted {$deletedCount} image(s)"
+                : "No images were deleted";
+
             return response()->json([
                 'success' => true,
-                'message' => 'Images deleted successfully',
+                'message' => $message,
+                'deleted_count' => $deletedCount
             ]);
         } catch (\Exception $e) {
+            Log::error('Bulk deletion failed:', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting images: ' . $e->getMessage(),
+                'message' => 'Failed to process deletion request: ' . $e->getMessage()
             ], 500);
         }
     }

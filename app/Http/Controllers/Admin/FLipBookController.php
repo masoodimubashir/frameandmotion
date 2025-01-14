@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client as ModelsClient;
 use App\Models\File;
 use App\Models\User;
 use App\Service\GoogleDriveService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class FLipBookController extends Controller
@@ -24,13 +22,11 @@ class FLipBookController extends Controller
     public function index(Request $request)
     {
         try {
-            
-            $users = User::whereIn('id', File::select('user_id')->distinct())
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get();
+
+            $users = User::where('role_name', 'client')->get();
 
             if ($request->ajax()) {
+
                 $query = File::query();
 
                 if ($request->has('user_id') && $request->user_id) {
@@ -39,7 +35,7 @@ class FLipBookController extends Controller
 
                 $files = $query->with('user')
                     ->orderBy('created_at', 'desc')
-                    ->paginate(12);
+                    ->paginate(20);
 
                 return response()->json([
                     'success' => true,
@@ -47,7 +43,6 @@ class FLipBookController extends Controller
                     'files' => $files,
                 ]);
             }
-
         } catch (\Exception $e) {
             return $request->ajax()
                 ? response()->json(['success' => false, 'message' => $e->getMessage()], 500)
@@ -77,6 +72,7 @@ class FLipBookController extends Controller
 
             // Find or create user folder
             $query = sprintf("name = '%s' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", $userId);
+            
             $folder = $this->driveService->searchFolders($query) ?? $this->driveService->createFolder($userId, $parentFolderId);
 
             foreach ($request->file('images') as $file) {
@@ -103,7 +99,6 @@ class FLipBookController extends Controller
             return response()->json(['success' => false, 'message' => 'Upload failed: ' . $e->getMessage()], 500);
         }
     }
-
     public function update(Request $request, $id)
     {
         $validation = Validator::make($request->all(), [
@@ -118,14 +113,13 @@ class FLipBookController extends Controller
         try {
             $file = File::findOrFail($id);
 
-            // Delete the old file
+            // Delete the old file from Google Drive
             $this->driveService->deleteFile($file->drive_id);
-            $file->delete();
 
+            // Upload new file
             $newFile = $request->file('image');
             $newFileName = time() . '_' . $newFile->getClientOriginalName();
 
-            // Upload the new file
             $uploadedFile = $this->driveService->uploadFile(
                 $newFileName,
                 file_get_contents($newFile->getRealPath()),
@@ -133,6 +127,7 @@ class FLipBookController extends Controller
                 $file->folder_id
             );
 
+            // Update the file record in the database
             $file->update([
                 'name' => $newFileName,
                 'drive_id' => $uploadedFile->id,
@@ -140,48 +135,104 @@ class FLipBookController extends Controller
                 'mime_type' => $newFile->getMimeType(),
             ]);
 
-            return response()->json(['message' => 'File updated successfully']);
+            return response()->json([
+                'success' => true,
+                'message' => 'File updated successfully',
+                'data' => $file
+            ]);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Update failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 
+
     public function destroy(Request $request)
     {
-        $validation = Validator::make($request->all(), [
-            'images' => ['required', 'string'],
-        ]);
-
-        if ($validation->fails()) {
-            return response()->json(['success' => false, 'message' => $validation->errors()->first()], 422);
-        }
-
         try {
-            $images = json_decode($request->images, true);
 
-            if (!is_array($images) || empty($images)) {
-                return response()->json(['success' => false, 'message' => 'No images provided for deletion'], 422);
+
+            $request->validate([
+                'images' => 'required|string'
+            ]);
+
+            $imagesData = json_decode($request->images, true);
+
+
+            if (empty($imagesData)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No images selected for deletion'
+                ], 400);
             }
 
-            DB::beginTransaction();
+            $processedFolders = [];
+            $deletedCount = 0;
 
-            foreach ($images as $image) {
-                $file = File::where('id', $image['id'])->where('drive_id', $image['drive_id'])->first();
+            foreach ($imagesData as $image) {
+                $file = File::find($image['id']);
 
                 if (!$file) {
                     continue;
                 }
 
-                $this->driveService->deleteFile($file->drive_id);
-                $file->delete();
+                try {
+                    // Delete file from Google Drive using the service
+                    $this->driveService->deleteFile($image['drive_id']);
+
+                    // Track the folder for potential cleanup
+                    if (!in_array($file->folder_id, $processedFolders)) {
+                        $processedFolders[] = $file->folder_id;
+                    }
+
+                    // Delete database record
+                    $file->delete();
+                    $deletedCount++;
+                } catch (\Exception $e) {
+                    Log::error('Failed to delete file:', [
+                        'file_id' => $image['id'],
+                        'drive_id' => $image['drive_id'],
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue with other deletions even if one fails
+                }
             }
 
-            DB::commit();
+            // Clean up empty folders
+            foreach ($processedFolders as $folderId) {
+                $remainingFiles = File::where('folder_id', $folderId)->count();
 
-            return response()->json(['success' => true, 'message' => 'Files deleted successfully']);
+                if ($remainingFiles === 0) {
+                    try {
+                        // Delete empty folder from Google Drive
+                        $this->driveService->deleteFile($folderId);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to delete folder:', [
+                            'folder_id' => $folderId,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+
+            $message = $deletedCount > 0
+                ? "Successfully deleted {$deletedCount} image(s)"
+                : "No images were deleted";
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'deleted_count' => $deletedCount
+            ]);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Bulk deletion failed:', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process deletion request: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

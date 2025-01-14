@@ -106,7 +106,7 @@ class AcceptBookingController extends Controller
             'start_datetime' => $startDateTime->format('Y-m-d\TH:i:s'),
             'end_datetime' => $endDateTime->format('Y-m-d\TH:i:s'),
             'timezone' => 'Asia/Kolkata',
-            'attendees' => [$client->email, 'sameershafi83@gmail.com']
+            'attendees' => [$client->email, 'masudimubashir@gmail.com']
         ]);
     }
 

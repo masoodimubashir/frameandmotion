@@ -6,6 +6,7 @@
     <title>{{ env('APP_NAME') }}</title>
     <meta content="width=device-width, initial-scale=1.0, shrink-to-fit=no" name="viewport" />
     <link rel="icon" href="{{ asset('img/kaiadmin/favicon.ico') }}" type="image/x-icon" />
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- Fonts and icons -->
     <script src="{{ asset('js/plugin/webfont/webfont.min.js') }}"></script>
