@@ -80,6 +80,7 @@ class AcceptBookingController extends Controller
                 'success' => true,
                 'message' => 'Client status updated successfully'
             ]);
+
         } catch (\Exception $e) {
             Log::error('Booking confirmation failed: ' . $e->getMessage());
             return response()->json([
@@ -106,7 +107,7 @@ class AcceptBookingController extends Controller
             'start_datetime' => $startDateTime->format('Y-m-d\TH:i:s'),
             'end_datetime' => $endDateTime->format('Y-m-d\TH:i:s'),
             'timezone' => 'Asia/Kolkata',
-            'attendees' => [$client->email, 'masudimubashir@gmail.com']
+            'attendees' => ['masudimubashir@gmail.com', 'masudimubashir@gmail.com']
         ]);
     }
 

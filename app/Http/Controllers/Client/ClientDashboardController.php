@@ -11,8 +11,6 @@ class ClientDashboardController extends Controller
     public function dashboard()
     {
 
-
-
         return view('client.dashboard.index');
     }
 

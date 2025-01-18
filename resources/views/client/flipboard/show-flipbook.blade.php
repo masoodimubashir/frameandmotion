@@ -163,7 +163,9 @@
                 </div>
 
                 <!-- Table Container (Image Cards & Select All) -->
-                <div id="tableContainer" style="min-height: 900px;"></div>
+                <div id="tableContainer" style="min-height: 900px;">
+
+                </div>
 
                 <!-- Loading Button (Overlay) -->
                 <div id="loadingButton" class="loading-overlay" style="display: none;">
@@ -202,6 +204,7 @@
             </div>
         </div>
     </div>
+
 
     @push('scripts')
         <script>
@@ -307,8 +310,11 @@
                             let cardWrapper = $('<div>').addClass('col-4');
                             let card = $('<div>').addClass('h-100 position-relative');
 
+                            console.log(file);
+
+                            // In the loadImages function, update the preview image URL:
                             let preview = $('<img>')
-                                .attr('src', `https://lh3.google.com/u/0/d/${file.drive_id}`)
+                                .attr('src', `${file.thumbnail}`)
                                 .addClass('card-img-top')
                                 .css({
                                     'object-fit': 'cover',
@@ -316,6 +322,9 @@
                                     'border-radius': '0.5rem',
                                     'box-shadow': '0px 0px 2px black'
                                 });
+
+                            // In the viewSelectedImages click handler, update the carousel image URL:
+                            const imageUrl = `${file.thumbnail}`;
 
                             let checkbox = $('<input>')
                                 .attr('type', 'checkbox')

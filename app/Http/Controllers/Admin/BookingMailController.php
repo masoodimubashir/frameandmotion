@@ -51,6 +51,7 @@ class BookingMailController extends Controller
     // }
 
     public function getFormDetails(Request $request){
+
         
         Client::create($request->all());
 

@@ -92,7 +92,7 @@ Route::middleware(['auth', 'isClient', 'isGoogleTokenValid'])->prefix('client')-
 
     Route::get('/dashboard', [ClientDashboardController::class, 'dashboard']);
     Route::get('/get-milestone', [ClientDashboardController::class, 'getMilestone']);
-    // Route::resource('/flipbook', UserFlipBoardController::class);
+    Route::resource('/flipbook', UserFlipBoardController::class);
 });
 
 

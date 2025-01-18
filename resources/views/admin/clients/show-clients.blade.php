@@ -71,7 +71,7 @@
                                                     </button>
 
                                                     @if (!$client->is_active)
-                                                        <form method="POST" action="{{ route('confirm-bookings') }}" class="d-inline">
+                                                        {{-- <form method="POST" action="{{ route('confirm-bookings') }}" class="d-inline">
                                                             @csrf
                                                             @method('PUT')
                                                             <input type="hidden" name="id"
@@ -79,7 +79,7 @@
                                                             <input type="hidden" name="is_active" value="1">
                                                             <button type="submit"
                                                                 class="btn btn-sm badge badge-success mt-2 me-1">Accept</button>
-                                                        </form>
+                                                        </form> --}}
 
 
                                                         <a class="btn btn-sm badge badge-success mt-2 me-1"

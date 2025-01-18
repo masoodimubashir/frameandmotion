@@ -21,19 +21,19 @@ class UserFlipBoardController extends Controller
 
     public function __construct()
     {
-
         try {
             $client = new Client();
             $client->setClientId(config('services.google.client_id'));
             $client->setClientSecret(config('services.google.client_secret'));
-            $client->refreshToken(config('services.google.client_refresh_token'));
+            $client->refreshToken(auth()->user()->google_refresh_token);
 
-            // Add scopes explicitly
-            $client->addScope('https://www.googleapis.com/auth/drive.readonly');
+            // Add all required scopes
+            $client->addScope([
+                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/drive.metadata.readonly'
+            ]);
 
-            // Set access type to offline to ensure refresh token works
             $client->setAccessType('offline');
-
             $this->drive = new Drive($client);
 
             Log::info('Google Drive client initialized successfully');
@@ -51,21 +51,49 @@ class UserFlipBoardController extends Controller
      */
     public function index(Request $request)
     {
-        
         $user = Auth::user();
-
-
         $query = $user->files()->orderBy('created_at');
 
         if ($request->filled(['start_date', 'end_date'])) {
-
             $startDate = Carbon::parse($request->start_date)->startOfDay();
             $endDate = Carbon::parse($request->end_date)->endOfDay();
-
             $query->whereBetween('created_at', [$startDate, $endDate]);
         }
 
         $files = $query->paginate(10);
+
+        // Transform files to include direct download URLs
+
+        try {
+
+            $files = $query->paginate(10);
+
+            // Add Google Drive image URLs to each file
+            $files->getCollection()->transform(function ($file) {
+                $driveFile = $this->drive->files->get($file->drive_id, [
+                    'fields' => 'id, name, webContentLink, thumbnailLink'
+                ]);
+                
+                $file->image_url = $driveFile->webContentLink;
+                $file->thumbnail = $driveFile->thumbnailLink;
+                
+                return $file;
+            });
+
+            return response()->json($files);
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to get file details', [
+                'file_id' => $files,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to get file details',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
 
         return response()->json($files);
     }
@@ -85,6 +113,8 @@ class UserFlipBoardController extends Controller
     public function store(Request $request)
     {
         try {
+
+
             // Validate request
             $request->validate([
                 'files' => 'required|array',
@@ -107,6 +137,7 @@ class UserFlipBoardController extends Controller
                 }
             }
 
+
             // Initialize PDF service
             $pdf = new PdfService();
             $pdf->AddPage();
@@ -120,13 +151,18 @@ class UserFlipBoardController extends Controller
             $xPos = 10;  // Starting X position
             $yPos = 40;  // Starting Y position
             $imageCount = 0;
-
             // Process each file
             foreach ($files as $file) {
                 try {
-                    // Get file metadata with error checking
-                    $driveFile = $this->drive->files->get($file['drive_id'], [
-                        'fields' => 'id, name, mimeType, size'
+                    // Extract the actual Drive ID from the URL
+                    $driveId = preg_match('/drive-storage\/(.+?)=/', $file['drive_id'], $matches) 
+                        ? $matches[1] 
+                        : $file['drive_id'];
+
+                    // Get file metadata with proper ID
+                    $driveFile = $this->drive->files->get($driveId, [
+                        'fields' => 'id, name, mimeType, size',
+                        'supportsAllDrives' => true
                     ]);
 
                     if (!$driveFile) {
@@ -138,8 +174,12 @@ class UserFlipBoardController extends Controller
                         throw new \Exception("File is not an image: " . $driveFile->getMimeType());
                     }
 
-                    // Download the file content
-                    $response = $this->drive->files->get($file['drive_id'], ['alt' => 'media']);
+                    // Download file content
+                    $response = $this->drive->files->get($driveId, [
+                        'alt' => 'media',
+                        'supportsAllDrives' => true
+                    ]);
+
                     $content = $response->getBody()->getContents();
 
                     if (empty($content)) {
@@ -162,7 +202,7 @@ class UserFlipBoardController extends Controller
 
                     // Add file details to the array
                     $downloadedFiles[] = [
-                        'original_id' => $file['drive_id'],
+                        'original_id' => $driveId,
                         'name' => $fileName,
                         'path' => $filePath
                     ];
@@ -171,7 +211,6 @@ class UserFlipBoardController extends Controller
                     $errors[] = $e->getMessage();
                 }
             }
-
             // If no files were processed successfully, throw an exception
             if (empty($downloadedFiles)) {
                 throw new \Exception("No files were successfully processed");
