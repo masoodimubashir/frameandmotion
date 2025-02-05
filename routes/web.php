@@ -20,19 +20,29 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 use Laravel\Socialite\Facades\Socialite;
 
-
+// FOr Testing Delete It In Production
 Route::get('/s', function () {
-    // session()->forget('google_token');
-    // session()->forget('google_refresh_token');
-    // session()->forget('pending_booking');
-    dd(Session::all());
-    return response()->json(['success' => true, 'message' => 'Session cleared']);
+
+    \session()->flush();
+    return response()->json([
+        'success' => true,
+        'message' => 'Session cleared',
+        'data' => Session::all()
+    ]);
 });
 
 
+// Routes For Login And Logout
 Route::get('/', [AuthController::class, 'welcome'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/logout', [AuthController::class, 'logout']);
+
+
+// Routes For Logging In Via Google
+Route::get('/create-event', [GoogleController::class, 'createEvent']);
+Route::get('auth/google/redirect', [GoogleController::class, 'redirectToGoogle'])->name('google.redirect');
+Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback'])->name('google.callback');
+
 
 // Admin Routes
 Route::middleware(['auth', 'isAdmin', 'isGoogleTokenValid'])->prefix('admin')->group(function () {
@@ -73,18 +83,8 @@ Route::middleware(['auth', 'isAdmin', 'isGoogleTokenValid'])->prefix('admin')->g
 });
 
 
-Route::get('/create-event', [GoogleController::class, 'createEvent']);
-
-
-Route::get('auth/google/redirect', [GoogleController::class, 'redirectToGoogle'])->name('google.redirect');
-
-
-Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback'])->name('google.callback');
-
-
-
 //  Client Routes
-Route::middleware(['auth', 'isClient', 'isGoogleTokenValid'])->prefix('client')->group(function () {
+Route::middleware(['auth', 'isClient'])->prefix('client')->group(function () {
 
     Route::get('/view-flipbook', function () {
         return view('client.flipboard.show-flipbook');

@@ -34,37 +34,36 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        // dd(Auth::attempt([
-        //     'username' => $request->username,
-        //     'password' => $request->password,
-        // ]));
-
         if (Auth::attempt([
             'username' => $request->username,
             'password' => $request->password,
         ])) {
-            
-            
-            $request->session()->regenerate();
+
+
             $user = Auth::user();
 
-            if (!$user->google_refresh_token) {
-                // First-time connection required
-                Log::info('User must connect Google account', ['user_id' => $user->id]);
-                
-                return redirect()->route('google.redirect');
-            }
+            if ($user->role_name === 'admin') {
 
-            // Check token validity and handle expiration
-            if (!$this->tokenValidationService->validateToken($user->google_access_token)) {
-                if (!$this->tokenValidationService->handleTokenExpiration($user)) {
-                    return redirect()->route('login')->withErrors([
-                        'error' => 'Your Google session has expired. Please log in again.'
-                    ]);
+                $request->session()->regenerate();
+
+                if (!$user->google_refresh_token) {
+                    return redirect()->route('google.redirect');
                 }
+
+                // Check token validity and handle expiration
+                if (!$this->tokenValidationService->validateToken($user->google_access_token)) {
+                    if (!$this->tokenValidationService->handleTokenExpiration($user)) {
+                        return redirect()->route('login')->withErrors([
+                            'error' => 'Your Google session has expired. Please log in again.'
+                        ]);
+                    }
+                }
+
             }
 
             return $this->handleLoginRedirect($user);
+
+
         }
 
         return back()->withErrors([
@@ -109,13 +108,12 @@ class AuthController extends Controller
 
     private function handleLoginRedirect($user)
     {
-        if (!$user->google_refresh_token) {
-            // If no Google connection, redirect to Google OAuth
-            return redirect()->route('google.redirect');
-        }
 
-        // User has Google connection, redirect based on role
+
         if ($user->role_name === 'admin') {
+            if (!$user->google_refresh_token) {
+                return redirect()->route('google.redirect');
+            }
             return redirect()->intended('/admin/dashboard');
         } elseif ($user->role_name === 'client') {
             return redirect()->intended('/client/dashboard');

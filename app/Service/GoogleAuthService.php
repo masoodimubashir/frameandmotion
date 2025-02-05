@@ -12,15 +12,15 @@ class GoogleAuthService
 
     public function redirectToGoogle()
     {
+
         return Socialite::driver('google')
             ->scopes([
                 'openid',
                 'profile',
                 'email',
-                'https://www.googleapis.com/auth/calendar',
-                'https://www.googleapis.com/auth/drive.file',
+                'https://www.googleapis.com/auth/drive',
             ])
-            ->with(['access_type' => 'offline'])
+            ->with(['access_type' => 'offline', 'prompt' => 'consent'])
             ->redirect();
     }
 

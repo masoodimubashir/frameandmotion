@@ -21,12 +21,6 @@ class AcceptBookingController extends Controller
     protected $googleAuthService;
     protected $googleCalendarService;
 
-    /**
-     * Constructor for the class.
-     *
-     * @param \App\Services\GoogleAuthService $googleAuthService  The Google authentication service
-     * @param \App\Services\AppGoogleCalendarService $googleCalendarService  The Google Calendar service
-     */
     public function __construct(GoogleAuthService $googleAuthService, AppGoogleCalendarService $googleCalendarService)
     {
         $this->googleAuthService = $googleAuthService;
@@ -64,7 +58,7 @@ class AcceptBookingController extends Controller
 
                 $user = $this->createUserForBooking($client, $booking, $username, $password);
 
-                $this->sendBookingEmail($client->email, $this->prepareBookingEmailData($client, $user, $password, $username));
+                $this->sendBookingEmail($client->email, $this->prepareBookingEmailData($client, $password, $username));
 
                 $this->createGoogleCalendarEvent($client);
 
@@ -81,7 +75,7 @@ class AcceptBookingController extends Controller
                 'message' => 'Client status updated successfully'
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Booking confirmation failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -90,29 +84,8 @@ class AcceptBookingController extends Controller
         }
     }
 
-
     /**
-     * Accepting The Client Model 
-     *
-     * @param App\Models\Client;;
-     */
-    private function createGoogleCalendarEvent(Client $client): bool
-    {
-        $startDateTime = Carbon::parse($client->date)->addHours(4)->setTimezone('Asia/Kolkata');
-        $endDateTime = $startDateTime->copy()->endOfDay();
-
-        return $this->googleCalendarService->createEvent([
-            'title' => 'Booking Confirmation',
-            'description' => 'Your booking has been confirmed',
-            'start_datetime' => $startDateTime->format('Y-m-d\TH:i:s'),
-            'end_datetime' => $endDateTime->format('Y-m-d\TH:i:s'),
-            'timezone' => 'Asia/Kolkata',
-            'attendees' => ['masudimubashir@gmail.com', 'masudimubashir@gmail.com']
-        ]);
-    }
-
-    /**
-     * Accepting The Client Model 
+     * Accepting The Client Model
      *
      * @param App\Models\Client;;
      */
@@ -124,7 +97,6 @@ class AcceptBookingController extends Controller
             'ceremony_date' => $client->date,
         ]);
     }
-
 
     /**
      * Accepting The Client Model , Username, Password
@@ -145,16 +117,33 @@ class AcceptBookingController extends Controller
     }
 
     /**
+     * Sending Mail To The User
+     *
+     * @param Password, Username
+     */
+    private function sendBookingEmail(string $email, array $data): void
+    {
+        try {
+
+            Mail::to($email)->send(new BookingMail($data));
+            Mail::to('masudimubashir@gmail.com')->send(new BookingMail($data));
+
+        } catch (Exception $e) {
+            Log::error('Error sending booking email: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Accepting The Client Model , Username, Password
      *
      * @param App\Models\Client, Password, Username
      */
-    private function prepareBookingEmailData(Client $client,  $password, $username): array
+    private function prepareBookingEmailData(Client $client, $password, $username): array
     {
         return [
             'name' => $client->name,
             'email' => $client->email,
-            'number' => $client->phone_number,
+            'number' => $client->number,
             'venue' => $client->venue,
             'date' => $client->date,
             'message' => 'Booking created successfully',
@@ -164,17 +153,22 @@ class AcceptBookingController extends Controller
     }
 
     /**
-     * Sending Mail To The User
+     * Accepting The Client Model
      *
-     * @param Password, Username
+     * @param App\Models\Client;
      */
-    private function sendBookingEmail(string $email, array $data): void
+    private function createGoogleCalendarEvent(Client $client): bool
     {
-        try {
-            Mail::to($email)->send(new BookingMail($data));
-            Log::info('Booking email sent to ' . $email);
-        } catch (\Exception $e) {
-            Log::error('Error sending booking email: ' . $e->getMessage());
-        }
+        $startDateTime = Carbon::parse($client->date)->addHours(4)->setTimezone('Asia/Kolkata');
+        $endDateTime = $startDateTime->copy()->endOfDay();
+
+        return $this->googleCalendarService->createEvent([
+            'title' => 'Booking Confirmation',
+            'description' => 'Your booking has been confirmed',
+            'start_datetime' => $startDateTime->format('Y-m-d\TH:i:s'),
+            'end_datetime' => $endDateTime->format('Y-m-d\TH:i:s'),
+            'timezone' => 'Asia/Kolkata',
+            'attendees' => [$client->email, 'masudimubashir@gmail.com']
+        ]);
     }
 }

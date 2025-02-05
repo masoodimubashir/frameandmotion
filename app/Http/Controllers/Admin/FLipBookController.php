@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\User;
+use App\Service\GoogleAuthService;
 use App\Service\GoogleDriveService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,9 +15,12 @@ class FLipBookController extends Controller
 {
     private $driveService;
 
-    public function __construct(GoogleDriveService $googleDriveService)
+    private $googleService;
+
+    public function __construct(GoogleDriveService $googleDriveService, GoogleAuthService $googleAuthService)
     {
         $this->driveService = $googleDriveService;
+        $this->googleService = $googleAuthService;
     }
 
     public function index(Request $request)
@@ -68,7 +72,7 @@ class FLipBookController extends Controller
 
             $userId = $request->user_id;
 
-            $parentFolderId = '17FPmHjZCS0512fTOx99gqYOUIAAjio8P';
+            $parentFolderId = '16YLCWhHIHqY8ozaF84hWKzJMyqs92UG7';
 
             // Find or create user folder
             $query = sprintf("name = '%s' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", $userId);

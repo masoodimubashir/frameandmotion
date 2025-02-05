@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Service\PdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -15,87 +16,100 @@ use Illuminate\Support\Facades\Log;
 class UserFlipBoardController extends Controller
 {
 
-
-    private $drive;
+    protected $adminDrive;
 
 
     public function __construct()
     {
         try {
-            $client = new Client();
-            $client->setClientId(config('services.google.client_id'));
-            $client->setClientSecret(config('services.google.client_secret'));
-            $client->refreshToken(auth()->user()->google_refresh_token);
 
-            // Add all required scopes
-            $client->addScope([
-                'https://www.googleapis.com/auth/drive.readonly',
-                'https://www.googleapis.com/auth/drive.metadata.readonly'
-            ]);
+            // Fetch admin user
+            $admin = User::where('role_name', 'admin')->firstOrFail();
 
-            $client->setAccessType('offline');
-            $this->drive = new Drive($client);
+            if (!$admin->google_refresh_token) {
+                throw new \Exception('Admin Google refresh token is missing.');
+            }
 
-            Log::info('Google Drive client initialized successfully');
+            // Initialize the Google Client
+            $adminClient = new Client();
+            $adminClient->setClientId(config('services.google.client_id'));
+            $adminClient->setClientSecret(config('services.google.client_secret'));
+            $adminClient->setAccessType('offline');
+
+
+            // Set the refresh token
+            $adminClient->setAccessToken($admin->google_refresh_token);
+
+            if ($adminClient->isAccessTokenExpired()) {
+                Log::info($adminClient->isAccessTokenExpired());
+
+                // Fetch a new access token using the refresh token
+                $newToken = $adminClient->fetchAccessTokenWithRefreshToken($admin->google_refresh_token);
+
+                // Save the new token back to the database
+                $admin->update([
+                    'google_refresh_token' => json_encode($newToken)
+                ]);
+
+            }
+
+            // Initialize the Google Drive service
+            $this->adminDrive = new Drive($adminClient);
+
+            Log::info('Admin Drive client initialized successfully.');
+            Log::info('Admin Drive client access token: ' . $adminClient->getAccessToken()['access_token']);
+            Log::info('Admin Drive client refresh token: ' . $adminClient->getAccessToken()['refresh_token']);
+
         } catch (\Exception $e) {
-            Log::error('Failed to initialize Google Drive client', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
             throw $e;
         }
     }
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
-        $user = Auth::user();
-        $query = $user->files()->orderBy('created_at');
-
-        if ($request->filled(['start_date', 'end_date'])) {
-            $startDate = Carbon::parse($request->start_date)->startOfDay();
-            $endDate = Carbon::parse($request->end_date)->endOfDay();
-            $query->whereBetween('created_at', [$startDate, $endDate]);
-        }
-
-        $files = $query->paginate(10);
-
-        // Transform files to include direct download URLs
-
         try {
+
+            $query = $request->user()->files()->orderBy('created_at');
+
+            if ($request->filled(['start_date', 'end_date'])) {
+                $query->whereBetween('created_at', [
+                    Carbon::parse($request->start_date)->startOfDay(),
+                    Carbon::parse($request->end_date)->endOfDay()
+                ]);
+            }
 
             $files = $query->paginate(10);
 
-            // Add Google Drive image URLs to each file
             $files->getCollection()->transform(function ($file) {
-                $driveFile = $this->drive->files->get($file->drive_id, [
-                    'fields' => 'id, name, webContentLink, thumbnailLink'
-                ]);
-                
-                $file->image_url = $driveFile->webContentLink;
-                $file->thumbnail = $driveFile->thumbnailLink;
-                
-                return $file;
+                try {
+                    $driveFile = $this->adminDrive->files->get($file->drive_id, [
+                        'fields' => 'id, name, webContentLink, thumbnailLink',
+                        'supportsAllDrives' => true
+                    ]);
+
+                    return array_merge($file->toArray(), [
+                        'image_url' => $driveFile->webContentLink,
+                        'thumbnail' => $driveFile->thumbnailLink
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to fetch file from Google Drive.', [
+                        'file_id' => $file->drive_id,
+                        'error' => $e->getMessage()
+                    ]);
+                    return $file;
+                }
             });
 
+
             return response()->json($files);
-            
+
         } catch (\Exception $e) {
-            Log::error('Failed to get file details', [
-                'file_id' => $files,
-                'error' => $e->getMessage()
-            ]);
             return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to get file details',
-                'error' => $e->getMessage()
+                'error' => 'Failed to fetch files',
+                'message' => $e->getMessage()
             ], 500);
         }
-
-
-        return response()->json($files);
     }
 
     /**
@@ -137,30 +151,30 @@ class UserFlipBoardController extends Controller
                 }
             }
 
-
             // Initialize PDF service
             $pdf = new PdfService();
             $pdf->AddPage();
             $pdf->SetAutoPageBreak(true, 10);
 
-            $imageWidth = 60;  // Set your desired width for the images
-            $imageHeight = 60; // Set your desired height for the images
-            $margin = 5;       // Margin between images
-            $imagesPerRow = 3; // Number of images per row
+            $imageWidth = 60;
+            $imageHeight = 60;
+            $margin = 5;
+            $imagesPerRow = 3;
 
-            $xPos = 10;  // Starting X position
-            $yPos = 40;  // Starting Y position
+            $xPos = 10;
+            $yPos = 40;
             $imageCount = 0;
+
             // Process each file
             foreach ($files as $file) {
                 try {
                     // Extract the actual Drive ID from the URL
-                    $driveId = preg_match('/drive-storage\/(.+?)=/', $file['drive_id'], $matches) 
-                        ? $matches[1] 
+                    $driveId = preg_match('/drive-storage\/(.+?)=/', $file['drive_id'], $matches)
+                        ? $matches[1]
                         : $file['drive_id'];
 
                     // Get file metadata with proper ID
-                    $driveFile = $this->drive->files->get($driveId, [
+                    $driveFile = $this->adminDrive->files->get($driveId, [
                         'fields' => 'id, name, mimeType, size',
                         'supportsAllDrives' => true
                     ]);
@@ -175,7 +189,7 @@ class UserFlipBoardController extends Controller
                     }
 
                     // Download file content
-                    $response = $this->drive->files->get($driveId, [
+                    $response = $this->adminDrive->files->get($driveId, [
                         'alt' => 'media',
                         'supportsAllDrives' => true
                     ]);
@@ -273,12 +287,6 @@ class UserFlipBoardController extends Controller
             ], 500);
         }
     }
-
-
-
-
-
-
 
 
     /**

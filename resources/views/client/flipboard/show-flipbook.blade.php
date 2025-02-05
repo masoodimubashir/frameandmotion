@@ -233,7 +233,7 @@
                         .addClass('btn btn-primary')
                         .text('Filter Images')
                         .click(function() {
-                            loadImages(1); // Reset to first page with filters
+                            loadImages(1);
                         });
 
                     // Clear Filter Button
@@ -243,7 +243,7 @@
                         .click(function() {
                             $('#startDate').val('');
                             $('#endDate').val('');
-                            loadImages(1); // Reset to first page without filters
+                            loadImages(1);
                         });
 
                     filterContainer.append(
@@ -272,7 +272,6 @@
                     }
 
                     $.get(url, function(response) {
-                        console.log(response);
 
                         $('#tableContainer').empty();
 
@@ -310,9 +309,6 @@
                             let cardWrapper = $('<div>').addClass('col-4');
                             let card = $('<div>').addClass('h-100 position-relative');
 
-                            console.log(file);
-
-                            // In the loadImages function, update the preview image URL:
                             let preview = $('<img>')
                                 .attr('src', `${file.thumbnail}`)
                                 .addClass('card-img-top')
@@ -323,7 +319,6 @@
                                     'box-shadow': '0px 0px 2px black'
                                 });
 
-                            // In the viewSelectedImages click handler, update the carousel image URL:
                             const imageUrl = `${file.thumbnail}`;
 
                             let checkbox = $('<input>')
@@ -370,6 +365,8 @@
                         $('#loadingButton').hide();
                         swal("Error!", "Failed to load images.", "error");
                     });
+
+
                 }
 
 
@@ -426,7 +423,6 @@
                 $('#uploadModalTrigger').click(function(e) {
                     e.preventDefault();
 
-                    // Get all checked checkboxes
                     const selectedCheckboxes = $('.image-checkbox:checked');
 
                     if (selectedCheckboxes.length === 0) {
@@ -480,8 +476,7 @@
                             }
                         },
                         error: function(xhr) {
-                            $('#uploadModalTrigger').prop('disabled', false).text(
-                                'Upload'); // Re-enable button on error
+                            $('#uploadModalTrigger').prop('disabled', false).text('Upload');
                             let errorMessage = "Failed to process request.";
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 errorMessage = xhr.responseJSON.message;

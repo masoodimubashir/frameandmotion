@@ -30,6 +30,8 @@ class GoogleController extends Controller
 
             $googleUser = $this->googleAuthService->handleGoogleCallback();
 
+//            dd($googleUser);
+
             $user = Auth::user();
 
             if (!$user) {
